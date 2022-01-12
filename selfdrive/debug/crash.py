@@ -42,7 +42,7 @@ def crasher():
 if __name__ == "__main__":
   procs = []
   try:
-    for _ in range(5):
+    for _ in range(10):
       p = multiprocessing.Process(target=netactivity)
       p.daemon = True
       p.start()
