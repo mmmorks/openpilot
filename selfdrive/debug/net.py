@@ -9,7 +9,7 @@ def log(msg):
   os.system(f"log -t crasher '{msg}'")
 
 def netactivity():
-  s = speedtest.Speedtest()
+  s = speedtest.Speedtest(timeout=1)
   s.get_servers()
   s.get_best_server()
   while True:
@@ -28,16 +28,15 @@ def crasher():
     cnt += 1
     d = random.choice(['enable', 'disable'])
     w = random.choice(['enable', 'disable'])
-    w = 'enable'
 
     log(f"#{str(cnt).ljust(4)}: data={d} wifi={w}, {round(time.monotonic() - start)}s")
     print(f"#{str(cnt).ljust(4)}: data={d} wifi={w}, {round(time.monotonic() - start)}s")
 
     os.system(f"LD_LIBRARY_PATH= svc data {d}")
-    time.sleep(random.uniform(0., 10.))
+    time.sleep(random.uniform(0., 1.))
 
     os.system(f"LD_LIBRARY_PATH= svc wifi {w}")
-    time.sleep(random.uniform(0., 10.))
+    time.sleep(random.uniform(0., 1.))
 
 
 if __name__ == "__main__":
