@@ -3,16 +3,21 @@ import os
 import random
 import time
 import multiprocessing
-
-speedtest = "/tmp/speedtest-cli"
+import speedtest
 
 def log(msg):
   os.system(f"log -t crasher '{msg}'")
 
-def speedtest():
+def netactivity():
+  s = speedtest.Speedtest()
+  s.get_servers()
+  s.get_best_server()
   while True:
-    args = random.choice(['', '--no-download', '--no-upload'])
-    os.system(f"{speedtest} --timeout 1 {args}")
+    n = random.randint(1, 5)
+    if random.random() > 0.5:
+      s.download(threads=n)
+    else:
+      s.upload(threads=n)
 
 def crasher():
   cnt = 0
@@ -36,13 +41,10 @@ def crasher():
 
 
 if __name__ == "__main__":
-  os.system(f"curl -Lo {speedtest} https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py")
-  os.system(f"chmod +x {speedtest}")
-
   procs = []
   try:
     for _ in range(5):
-      p = multiprocessing.Process(target=speedtest)
+      p = multiprocessing.Process(target=netactivity)
       p.daemon = True
       p.start()
       procs.append(p)
