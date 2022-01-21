@@ -14,10 +14,11 @@ const CanMsg HONDA_BOSCH_LONG_TX_MSGS[] = {{0xE4, 1, 5}, {0x1DF, 1, 8}, {0x1EF, 
 // In openpilot: ((gas1_norm + gas2_norm)/2) > 15
 // gas_norm1 = ((gain_dbc1*gas1) + offset_dbc)
 // gas_norm2 = ((gain_dbc2*gas2) + offset_dbc)
-// assuming that 2*(gain_dbc1*gas1) == (gain_dbc2*gas2)
-// In this safety: ((gas1 + (gas2/2))/2) > THRESHOLD
+// one of gas1 or gas2 is double the other one (depending on the model)
+// gain_dbc1*gas1 + gain_dbc2*gas2 = 3 * avg(gas)
+// In this safety: ((gas1 + gas2)/3) > THRESHOLD
 const int HONDA_GAS_INTERCEPTOR_THRESHOLD = 344;
-#define HONDA_GET_INTERCEPTOR(msg) (((GET_BYTE((msg), 0) << 8) + GET_BYTE((msg), 1) + ((GET_BYTE((msg), 2) << 8) + GET_BYTE((msg), 3)) / 2U ) / 2U) // avg between 2 tracks
+#define HONDA_GET_INTERCEPTOR(msg) ((((GET_BYTE((msg), 0) << 8) + GET_BYTE((msg), 1)) + ((GET_BYTE((msg), 2) << 8) + GET_BYTE((msg), 3))) / 3U) // avg between two signals when one is doubled
 const int HONDA_BOSCH_NO_GAS_VALUE = -30000; // value sent when not requesting gas
 const int HONDA_BOSCH_GAS_MAX = 2000;
 const int HONDA_BOSCH_ACCEL_MIN = -350; // max braking == -3.5m/s2
