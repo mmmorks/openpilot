@@ -251,10 +251,11 @@ def thermald_thread(end_event, hw_queue):
     msg = read_thermal(thermal_config)
 
     if sm.updated['pandaStates'] and len(pandaStates) > 0:
-      pandaState = pandaStates[0]
 
-      if pandaState.pandaType != log.PandaState.PandaType.unknown:
-        onroad_conditions["ignition"] = pandaState.ignitionLine or pandaState.ignitionCan
+      # Set ignition based on any panda connected
+      onroad_conditions["ignition"] = any(ps.ignitionLine or ps.ignitionCan for ps in pandaStates if ps.pandaType != log.PandaState.PandaType.unknown)
+
+      pandaState = pandaStates[0]
 
       in_car = pandaState.harnessStatus != log.PandaState.HarnessStatus.notConnected
       usb_power = peripheralState.usbPowerMode != log.PeripheralState.UsbPowerMode.client
@@ -342,7 +343,8 @@ def thermald_thread(end_event, hw_queue):
     set_offroad_alert_if_changed("Offroad_TemperatureTooHigh", (not onroad_conditions["device_temp_good"]))
 
     if TICI:
-      set_offroad_alert_if_changed("Offroad_StorageMissing", (not Path("/data/media").is_mount()))
+      missing = (not Path("/data/media").is_mount()) and (not os.path.isfile("/persist/comma/living-in-the-moment"))
+      set_offroad_alert_if_changed("Offroad_StorageMissing", missing)
 
     # Handle offroad/onroad transition
     should_start = all(onroad_conditions.values())
@@ -365,7 +367,7 @@ def thermald_thread(end_event, hw_queue):
 
       try:
         with open('/dev/kmsg', 'w') as kmsg:
-          kmsg.write(f"[thermald] engaged: {engaged}")
+          kmsg.write(f"<3>[thermald] engaged: {engaged}\n")
       except Exception:
         pass
 
