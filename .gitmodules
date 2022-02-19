@@ -10,3 +10,6 @@
 [submodule "cereal"]
 	path = cereal
 	url = ../cereal
+[submodule "opendbc"]
+	path = opendbc
+	url = ../opendbc
