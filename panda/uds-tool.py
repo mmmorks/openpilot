@@ -1,7 +1,5 @@
-#!/usr/bin/python
-
 from panda import Panda
-from panda.python.uds import UdsClient, SESSION_TYPE
+from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
 
 if __name__ == "__main__":
   panda = Panda()
@@ -22,7 +20,42 @@ if __name__ == "__main__":
     print("Security access request key for seed 61")
     data = uds_client.security_access(ACCESS_TYPE.ADVANCED_SEED)
     print(data)
+    seed = data[-4:]
+    seed1 = seed[0:2]
+    seed2 = seed[2:4]
+    key = int.from_bytes(seed1, "big") << 16 | int.from_bytes(seed2, "big") + 0x3039
+    key = key.to_bytes(4, "big")
+    print("key = ", key)
   except BaseException as e:
     print(e)
 
+  try:
+    print("Security access send key for seed 61")
+    data = uds_client.security_access(ACCESS_TYPE.ADVANCED_KEY, key)
+    print(data)
+  except BaseException as e:
+    print(e)
+
+  try:
+    print("Set diagnostic session type to 0x60 (god mode)")
+    data = uds_client.diagnostic_session_control(SESSION_TYPE.GOD_MODE)
+    print(data)
+  except BaseException as e:
+    print(e)
+
+  try:
+    print("Reading memory!")
+    start_addr = 0x0
+    end_addr = 0x5ffff
+    block_size = 512
+    image = bytes()
+    while start_addr < end_addr:
+        image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
+        start_addr += block_size
+    
+    with open("image.bin", "wb") as f:
+        f.write(image)
+    
+  except BaseException as e:
+    print(e)
 
