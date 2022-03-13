@@ -47,10 +47,13 @@ if __name__ == "__main__":
     print("Reading memory!")
     start_addr = 0x0
     end_addr = 0x5ffff
-    block_size = 512
+    DEFAULT_BLOCK_SIZE = 512
     image = bytes()
-    while start_addr < end_addr:
-        image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
+    while start_addr =< end_addr:
+        block_size = min(DEFAULT_BLOCK_SIZE, end_addr - start_addr + 1)
+        uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
+        image += uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
+        #image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
         start_addr += block_size
     
     with open("image.bin", "wb") as f:
