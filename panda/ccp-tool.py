@@ -3,8 +3,6 @@ import tqdm
 from argparse import ArgumentParser
 
 from panda import Panda
-from tp20 import TP20Transport
-from kwp2000 import KWP2000Client, ECU_IDENTIFICATION_TYPE
 
 try:
     from panda.ccp import CcpClient, BYTE_ORDER
@@ -22,28 +20,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     p = Panda()
-    p.can_clear(0xFFFF)
-    p.set_safety_mode(Panda.SAFETY_ALLOUTPUT)
-
-    print("Connecting using KWP2000...")
-    tp20 = TP20Transport(p, 0x9, bus=args.bus)
-    kwp_client = KWP2000Client(tp20)
-
-    print("Reading ecu identification & flash status")
-    ident = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.ECU_IDENT)
-    print("ECU identification", ident)
-
-    status = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.STATUS_FLASH)
-    print("Flash status", status)
+    p.set_safety_mode(Panda.SAFETY_ELM327)
 
     print("\nConnecting using CCP...")
 
     tx_addr = 0x720
     rx_addr = tx_addr << 0x12
     station_id = 0x30
+    print("tx_addr = {}, rx_addr = {}".format(tx_addr, rx_addr))
 
-    client = CcpClient(p, tx_addr, rx_addr, byte_order=BYTE_ORDER.LITTLE_ENDIAN, bus=args.bus)
-    client.test_availability(station_id)
+    client = CcpClient(p, tx_addr, rx_addr, byte_order=BYTE_ORDER.LITTLE_ENDIAN, bus=args.bus, debug=True)
     client.connect(station_id)
 
     progress = tqdm.tqdm(total=args.end_address - args.start_address)
