@@ -25,9 +25,9 @@ if __name__ == "__main__":
     print("\nConnecting using CCP...")
 
     tx_addr = 0x720
-    rx_addr = tx_addr << 0x12
+    rx_addr = 0x721
     station_id = 0x30
-    print("tx_addr = {}, rx_addr = {}".format(tx_addr, rx_addr))
+    print("tx_addr = {}, rx_addr = {}".format(hex(tx_addr), hex(rx_addr)))
 
     client = CcpClient(p, tx_addr, rx_addr, byte_order=BYTE_ORDER.LITTLE_ENDIAN, bus=args.bus, debug=True)
     client.connect(station_id)
