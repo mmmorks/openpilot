@@ -23,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--tx-address", default=0x720, type=auto_int, help="transmit CAN message ID")
     parser.add_argument("--rx-address", default=0x721, type=auto_int, help="receive CAN message ID")
     parser.add_argument("--station-id", default=0x30, type=auto_int, help="CCP station ID")
-    parser.add_argument("--debug", action=store_true, help="Enable debug output")
+    parser.add_argument("--debug", action="store_true", help="Enable debug output")
     args = parser.parse_args()
 
     p = Panda()
