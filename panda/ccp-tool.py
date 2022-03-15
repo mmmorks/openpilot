@@ -17,6 +17,9 @@ if __name__ == "__main__":
     parser.add_argument("--start-address", default=0, type=int, help="start address")
     parser.add_argument("--end-address", default=0x5FFFF, type=int, help="end address (inclusive)")
     parser.add_argument("--output", required=True, help="output file")
+    parser.add_argument("--tx-address", default=0x720, type=int, help="transmit CAN message ID")
+    parser.add_argument("--rx-address", default=0x721, type=int, help="receive CAN message ID")
+    parser.add_argument("--station-id", default=0x30, type=int, help="CCP station ID")
     args = parser.parse_args()
 
     p = Panda()
@@ -24,15 +27,10 @@ if __name__ == "__main__":
 
     print("\nConnecting using CCP...")
 
-    tx_addr = 0x720
-    rx_addr = 0x721
-    station_id = 0x30
-    print("tx_addr = {}, rx_addr = {}".format(hex(tx_addr), hex(rx_addr)))
+    client = CcpClient(p, args.tx_address, args.rx_address, byte_order=BYTE_ORDER.LITTLE_ENDIAN, bus=args.bus, debug=False)
+    client.connect(args.station_id)
 
-    client = CcpClient(p, tx_addr, rx_addr, byte_order=BYTE_ORDER.LITTLE_ENDIAN, bus=args.bus, debug=True)
-    client.connect(station_id)
-
-    progress = tqdm.tqdm(total=args.end_address - args.start_address)
+    progress = tqdm.tqdm(total=args.end_address - args.start_address + 1)
 
     addr = args.start_address
     client.set_memory_transfer_address(0, 0, addr)
