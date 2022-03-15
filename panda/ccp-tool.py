@@ -12,7 +12,7 @@ try:
 except ImportError:
     from panda.python.ccp import CcpClient, BYTE_ORDER
 
-CHUNK_SIZE = 4
+CHUNK_SIZE = 5
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--tx-address", default=0x720, type=auto_int, help="transmit CAN message ID")
     parser.add_argument("--rx-address", default=0x721, type=auto_int, help="receive CAN message ID")
     parser.add_argument("--station-id", default=0x30, type=auto_int, help="CCP station ID")
+    parser.add_argument("--debug", action=store_true, "Enable debug output")
     args = parser.parse_args()
 
     p = Panda()
@@ -30,18 +31,20 @@ if __name__ == "__main__":
 
     print("\nConnecting using CCP...")
 
-    client = CcpClient(p, args.tx_address, args.rx_address, byte_order=BYTE_ORDER.LITTLE_ENDIAN, bus=args.bus, debug=False)
+    client = CcpClient(p, args.tx_address, args.rx_address, byte_order=BYTE_ORDER.BIG_ENDIAN, bus=args.bus, debug=args.debug)
     client.connect(args.station_id)
-
-    progress = tqdm.tqdm(total=args.end_address - args.start_address + 1)
 
     addr = args.start_address
     client.set_memory_transfer_address(0, 0, addr)
+    debug = args.debug
 
+    if not debug:
+        progress = tqdm.tqdm(total=args.end_address - args.start_address + 1)
     with open(args.output, "wb") as f:
         while addr < args.end_address:
             f.write(client.upload(CHUNK_SIZE)[:CHUNK_SIZE])
             f.flush()
 
             addr += CHUNK_SIZE
-            progress.update(CHUNK_SIZE)
+            if not debug:
+                progress.update(CHUNK_SIZE)
