@@ -4,6 +4,9 @@ from argparse import ArgumentParser
 
 from panda import Panda
 
+def auto_int(i):
+    return int(i, 0)
+
 try:
     from panda.ccp import CcpClient, BYTE_ORDER
 except ImportError:
@@ -13,13 +16,13 @@ CHUNK_SIZE = 4
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--bus", default=0, type=int, help="CAN bus number to use")
-    parser.add_argument("--start-address", default=0, type=int, help="start address")
-    parser.add_argument("--end-address", default=0x5FFFF, type=int, help="end address (inclusive)")
+    parser.add_argument("--bus", default=0, type=auto_int, help="CAN bus number to use")
+    parser.add_argument("--start-address", default=0, type=auto_int, help="start address")
+    parser.add_argument("--end-address", default=0x5FFFF, type=auto_int, help="end address (inclusive)")
     parser.add_argument("--output", required=True, help="output file")
-    parser.add_argument("--tx-address", default=0x720, type=int, help="transmit CAN message ID")
-    parser.add_argument("--rx-address", default=0x721, type=int, help="receive CAN message ID")
-    parser.add_argument("--station-id", default=0x30, type=int, help="CCP station ID")
+    parser.add_argument("--tx-address", default=0x720, type=auto_int, help="transmit CAN message ID")
+    parser.add_argument("--rx-address", default=0x721, type=auto_int, help="receive CAN message ID")
+    parser.add_argument("--station-id", default=0x30, type=auto_int, help="CCP station ID")
     args = parser.parse_args()
 
     p = Panda()
