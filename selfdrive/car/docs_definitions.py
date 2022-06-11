@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Union, no_type_check
 
+TACO_TORQUE_THRESHOLD = 2.5  # m/s^2
+GREAT_TORQUE_THRESHOLD = 1.4  # m/s^2
+GOOD_TORQUE_THRESHOLD = 1.0  # m/s^2
+
 
 class Tier(Enum):
   GOLD = "The best openpilot experience. Great highway driving and beyond."
