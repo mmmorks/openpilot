@@ -4,12 +4,6 @@
 [submodule "rednose_repo"]
 	path = rednose_repo
 	url = ../../commaai/rednose.git
-[submodule "panda"]
-	path = panda
-	url = ../panda
 [submodule "cereal"]
 	path = cereal
 	url = ../cereal
-[submodule "opendbc"]
-	path = opendbc
-	url = ../opendbc
