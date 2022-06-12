@@ -6,4 +6,10 @@
 	url = ../../commaai/rednose.git
 [submodule "cereal"]
 	path = cereal
-	url = ../cereal
+	url = ../../commaai/cereal.git
+[submodule "opendbc"]
+	path = opendbc
+	url = ../opendbc
+[submodule "panda"]
+	path = panda
+	url = ../panda
