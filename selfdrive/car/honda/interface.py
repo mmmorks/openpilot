@@ -3,6 +3,7 @@ from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
 from common.numpy_fast import interp
+from selfdrive.controls.lib.latcontrol_torque import set_torque_tune
 from selfdrive.car.honda.values import CarControllerParams, CruiseButtons, HondaFlags, CAR, HONDA_BOSCH, HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_ALT_BRAKE_SIGNAL, HONDA_BOSCH_RADARLESS
 from selfdrive.car import STD_CARGO_KG, CivicParams, create_button_enable_events, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -61,13 +62,20 @@ class CarInterface(CarInterfaceBase):
     if candidate == CAR.ACCORD and 0x191 in fingerprint[1]:
       ret.transmissionType = TransmissionType.cvt
 
-    # Certain Hondas have an extra steering sensor at the bottom of the steering rack,
-    # which improves controls quality as it removes the steering column torsion from feedback.
-    # Tire stiffness factor fictitiously lower if it includes the steering column torsion effect.
-    # For modeling details, see p.198-200 in "The Science of Vehicle Dynamics (2014), M. Guiggiani"
     ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0], [0]]
-    ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
-    ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
+    
+    # set torque tune for supported models 
+    if candidate in (CAR.PILOT_2019,):
+      torque_params = CarInterfaceBase.get_torque_params(candidate)
+      steering_angle_deadzone_deg = 0.0
+      set_torque_tune(ret.lateralTuning, torque_params['LAT_ACCEL_FACTOR'], torque_params['FRICTION'], steering_angle_deadzone_deg)
+    else:
+      # Certain Hondas have an extra steering sensor at the bottom of the steering rack,
+      # which improves controls quality as it removes the steering column torsion from feedback.
+      # Tire stiffness factor fictitiously lower if it includes the steering column torsion effect.
+      # For modeling details, see p.198-200 in "The Science of Vehicle Dynamics (2014), M. Guiggiani"
+      ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
+      ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
 
     if candidate in HONDA_BOSCH:
       ret.longitudinalTuning.kpV = [0.25]
@@ -259,7 +267,6 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 16.  # as spec
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
       tire_stiffness_factor = 0.444
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]]
       ret.longitudinalTuning.kpBP = [0., 2., 5., 35.]
       ret.longitudinalTuning.kpV = [1.2, 1.1, 0.8, 0.5]
       ret.longitudinalTuning.kiBP = [0., 35.]
