@@ -17,7 +17,7 @@ signal.signal(signal.SIGINT, sigint_handler)
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser(description='Sniff a communication socket')
-  parser.add_argument('control_type', help="[pid|indi|lqr|angle]")
+  parser.add_argument('control_type', help="[pid|indi|torque|angle]")
   parser.add_argument('--addr', default='127.0.0.1', help="IP address for optional ZMQ listener, default to msgq")
   parser.add_argument('--group', default='all', help="speed group to display, [crawl|slow|medium|fast|veryfast|germany|all], default to all")
   args = parser.parse_args()
@@ -60,8 +60,8 @@ if __name__ == "__main__":
       control_state = sm['controlsState'].lateralControlState.pidState
     elif args.control_type == "indi":
       control_state = sm['controlsState'].lateralControlState.indiState
-    elif args.control_type == "lqr":
-      control_state = sm['controlsState'].lateralControlState.lqrState
+    elif args.control_type == "torque":
+      control_state = sm['controlsState'].lateralControlState.torqueState
     elif args.control_type == "angle":
       control_state = sm['controlsState'].lateralControlState.angleState
     else:
@@ -81,36 +81,36 @@ if __name__ == "__main__":
 
       # wait 5 seconds after engage / standstill / override / lane change
       if cnt >= 500:
-        actual_angle = control_state.steeringAngleDeg
-        desired_angle = control_state.steeringAngleDesiredDeg
+        actual_lat_accel = control_state.actualLateralAccel
+        desired_lat_accel = control_state.desiredLateralAccel
 
         # calculate error before rounding, then round for stats grouping
-        angle_error = abs(desired_angle - actual_angle)
-        actual_angle = round(actual_angle, 1)
-        desired_angle = round(desired_angle, 1)
-        angle_error = round(angle_error, 2)
-        angle_abs = int(abs(round(desired_angle, 0)))
+        lat_accel_error = abs(desired_lat_accel - actual_lat_accel)
+        actual_lat_accel = round(actual_lat_accel, 2)
+        desired_lat_accel = round(desired_lat_accel, 2)
+        lat_accel_error = round(lat_accel_error, 3)
+        lat_accel_abs = int(abs(round(desired_lat_accel*10, 0)))
 
         for group, group_props in all_groups.items():
           if v_ego > group_props[0]:
             # collect stats
-            speed_group_stats[group][angle_abs]["cnt"] += 1
-            speed_group_stats[group][angle_abs]["err"] += angle_error
-            speed_group_stats[group][angle_abs]["steer"] += abs(steer)
+            speed_group_stats[group][lat_accel_abs]["cnt"] += 1
+            speed_group_stats[group][lat_accel_abs]["err"] += lat_accel_error
+            speed_group_stats[group][lat_accel_abs]["steer"] += abs(steer)
             if len(d_path_points):
-              speed_group_stats[group][angle_abs]["dpp"] += abs(d_path_points[0])
+              speed_group_stats[group][lat_accel_abs]["dpp"] += abs(d_path_points[0])
             if steer_limited:
-              speed_group_stats[group][angle_abs]["limited"] += 1
+              speed_group_stats[group][lat_accel_abs]["limited"] += 1
             if control_state.saturated:
-              speed_group_stats[group][angle_abs]["saturated"] += 1
-            if actual_angle == desired_angle:
-              speed_group_stats[group][angle_abs]["="] += 1
+              speed_group_stats[group][lat_accel_abs]["saturated"] += 1
+            if actual_lat_accel == desired_lat_accel:
+              speed_group_stats[group][lat_accel_abs]["="] += 1
             else:
-              if desired_angle == 0.:
+              if desired_lat_accel == 0.:
                 overshoot = True
               else:
-                overshoot = desired_angle < actual_angle if desired_angle > 0. else desired_angle > actual_angle
-              speed_group_stats[group][angle_abs]["+" if overshoot else "-"] += 1
+                overshoot = desired_lat_accel < actual_lat_accel if desired_lat_accel > 0. else desired_lat_accel > actual_lat_accel
+              speed_group_stats[group][lat_accel_abs]["+" if overshoot else "-"] += 1
             break
     else:
       cnt = 0

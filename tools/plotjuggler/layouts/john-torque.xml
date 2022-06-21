@@ -1,0 +1,101 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root>
+ <tabbed_widget parent="main_window" name="Main Window">
+  <Tab containers="1" tab_name="tab1">
+   <Container>
+    <DockSplitter orientation="-" sizes="0.249708;0.252042;0.248541;0.249708" count="4">
+     <DockArea name="...">
+      <plot mode="TimeSeries" flip_x="false" flip_y="false" style="Lines">
+       <range bottom="-1.815975" top="0.389632" right="59.899827" left="0.000000"/>
+       <limitY/>
+       <curve color="#1f77b4" name="/controlsState/lateralControlState/torqueState/actualLateralAccel"/>
+       <curve color="#d62728" name="/controlsState/lateralControlState/torqueState/desiredLateralAccel"/>
+      </plot>
+     </DockArea>
+     <DockArea name="...">
+      <plot mode="TimeSeries" flip_x="false" flip_y="false" style="Lines">
+       <range bottom="-1.559791" top="0.242601" right="59.899827" left="0.000000"/>
+       <limitY/>
+       <curve color="#1ac938" name="Actual lateral accel (roll compensated)"/>
+       <curve color="#ff7f0e" name="Desired lateral accel (roll compensated)"/>
+      </plot>
+     </DockArea>
+     <DockArea name="...">
+      <plot mode="TimeSeries" flip_x="false" flip_y="false" style="Lines">
+       <range bottom="-1.157770" top="0.435503" right="59.899827" left="0.000000"/>
+       <limitY/>
+       <curve color="#9467bd" name="/carControl/actuatorsOutput/steer">
+        <transform alias="/carControl/actuatorsOutput/steer[Scale/Offset]" name="Scale/Offset">
+         <options value_offset="0" value_scale="-1" time_offset="0"/>
+        </transform>
+       </curve>
+       <curve color="#1f77b4" name="/controlsState/lateralControlState/torqueState/f"/>
+       <curve color="#d62728" name="max_lat_accel"/>
+      </plot>
+     </DockArea>
+     <DockSplitter orientation="|" sizes="0.5;0.5" count="2">
+      <DockArea name="...">
+       <plot mode="TimeSeries" flip_x="false" flip_y="false" style="Lines">
+        <range bottom="-0.025000" top="1.025000" right="59.899827" left="0.000000"/>
+        <limitY/>
+        <curve color="#1ac938" name="/carControl/latActive"/>
+        <curve color="#ff7f0e" name="/carState/steeringPressed"/>
+        <curve color="#1f77b4" name="/controlsState/alertStatus"/>
+       </plot>
+      </DockArea>
+      <DockArea name="...">
+       <plot mode="TimeSeries" flip_x="false" flip_y="false" style="Lines">
+        <range bottom="15.992491" top="17.469036" right="59.899827" left="0.000000"/>
+        <limitY/>
+        <curve color="#f14cc1" name="/carState/vEgo"/>
+       </plot>
+      </DockArea>
+     </DockSplitter>
+    </DockSplitter>
+   </Container>
+  </Tab>
+  <currentTabIndex index="0"/>
+ </tabbed_widget>
+ <use_relative_time_offset enabled="1"/>
+ <!-- - - - - - - - - - - - - - - -->
+ <!-- - - - - - - - - - - - - - - -->
+ <Plugins>
+  <plugin ID="DataLoad Rlog"/>
+  <plugin ID="Cereal Subscriber"/>
+ </Plugins>
+ <!-- - - - - - - - - - - - - - - -->
+ <!-- - - - - - - - - - - - - - - -->
+ <customMathEquations>
+  <snippet name="Actual lateral accel (roll compensated)">
+   <global></global>
+   <function>return (value * v1 ^ 2) - (v2 * 9.81)</function>
+   <linked_source>/controlsState/curvature</linked_source>
+   <additional_sources>
+    <v1>/carState/vEgo</v1>
+    <v2>/liveParameters/roll</v2>
+   </additional_sources>
+  </snippet>
+  <snippet name="Desired lateral accel (roll compensated)">
+   <global></global>
+   <function>return (value * v1 ^ 2) - (v2 * 9.81)</function>
+   <linked_source>/controlsState/desiredCurvature</linked_source>
+   <additional_sources>
+    <v1>/carState/vEgo</v1>
+    <v2>/liveParameters/roll</v2>
+   </additional_sources>
+  </snippet>
+  <snippet name="max_lat_accel">
+   <global></global>
+   <function>return v1 * v2 - (v3 * 9.81)</function>
+   <linked_source>/liveLocationKalman/orientationNED/value/0</linked_source>
+   <additional_sources>
+    <v1>/liveLocationKalman/velocityCalibrated/value/0</v1>
+    <v2>/liveLocationKalman/angularVelocityCalibrated/value/2</v2>
+    <v3>/liveLocationKalman/calibratedOrientationNED/value/0</v3>
+   </additional_sources>
+  </snippet>
+ </customMathEquations>
+ <snippets/>
+ <!-- - - - - - - - - - - - - - - -->
+</root>
+
