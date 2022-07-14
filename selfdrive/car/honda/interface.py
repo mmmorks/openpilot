@@ -3,7 +3,6 @@ from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
 from common.numpy_fast import interp
-from selfdrive.controls.lib.latcontrol_torque import set_torque_tune
 from selfdrive.car.honda.values import CarControllerParams, CruiseButtons, HondaFlags, CAR, HONDA_BOSCH, HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_ALT_BRAKE_SIGNAL, HONDA_BOSCH_RADARLESS
 from selfdrive.car import STD_CARGO_KG, CivicParams, create_button_enable_events, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -66,9 +65,8 @@ class CarInterface(CarInterfaceBase):
     
     # set torque tune for supported models 
     if candidate in (CAR.PILOT_2019,):
-      torque_params = CarInterfaceBase.get_torque_params(candidate)
       steering_angle_deadzone_deg = 0.0
-      set_torque_tune(ret.lateralTuning, torque_params['LAT_ACCEL_FACTOR'], torque_params['FRICTION'], steering_angle_deadzone_deg)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning, steering_angle_deadzone_deg)
     else:
       # Certain Hondas have an extra steering sensor at the bottom of the steering rack,
       # which improves controls quality as it removes the steering column torsion from feedback.
