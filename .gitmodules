@@ -13,3 +13,6 @@
 [submodule "panda"]
 	path = panda
 	url = ../panda
+[submodule "body"]
+  path = body
+  url = ../../commaai/body.git
