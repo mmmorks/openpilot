@@ -140,7 +140,6 @@ CAR_INFO: Dict[str, Optional[Union[HondaCarInfo, List[HondaCarInfo]]]] = {
   CAR.PILOT_2019: HondaCarInfo("Honda Pilot 2019", min_steer_speed=12. * CV.MPH_TO_MS, harness=Harness.nidec),
   CAR.PASSPORT: HondaCarInfo("Honda Passport 2019-21", "All", min_steer_speed=12. * CV.MPH_TO_MS, harness=Harness.nidec),
   CAR.RIDGELINE: HondaCarInfo("Honda Ridgeline 2017-22", min_steer_speed=12. * CV.MPH_TO_MS, harness=Harness.nidec),
->>>>>>> upstream/devel
   CAR.INSIGHT: HondaCarInfo("Honda Insight 2019-22", "All", min_steer_speed=3. * CV.MPH_TO_MS, harness=Harness.bosch_a),
   CAR.HONDA_E: HondaCarInfo("Honda e 2020", "All", min_steer_speed=3. * CV.MPH_TO_MS, harness=Harness.bosch_a),
 }
