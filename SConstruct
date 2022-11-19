@@ -49,6 +49,11 @@ AddOption('--no-thneed',
           dest='no_thneed',
           help='avoid using thneed')
 
+AddOption('--pc-thneed',
+          action='store_true',
+          dest='pc_thneed',
+          help='use thneed on pc')
+
 AddOption('--no-test',
           action='store_false',
           dest='test',
@@ -70,7 +75,7 @@ lenv = {
 
   "ACADOS_SOURCE_DIR": Dir("#third_party/acados/include/acados").abspath,
   "ACADOS_PYTHON_INTERFACE_PATH": Dir("#pyextra/acados_template").abspath,
-  "TERA_PATH": Dir("#").abspath + f"/third_party/acados/{arch}/t_renderer",
+  "TERA_PATH": Dir("#").abspath + f"/third_party/acados/{arch}/t_renderer"
 }
 
 rpath = lenv["LD_LIBRARY_PATH"].copy()
@@ -94,9 +99,6 @@ if arch == "larch64":
     "#third_party/libyuv/larch64/lib",
     "/usr/lib/aarch64-linux-gnu"
   ]
-  cpppath += [
-    "#system/camerad/include",
-  ]
   cflags = ["-DQCOM2", "-mcpu=cortex-a57"]
   cxxflags = ["-DQCOM2", "-mcpu=cortex-a57"]
   rpath += ["/usr/local/lib"]
@@ -107,6 +109,9 @@ else:
 
   # MacOS
   if arch == "Darwin":
+    if real_arch == "x86_64":
+      lenv["TERA_PATH"] = Dir("#").abspath + f"/third_party/acados/Darwin_x86_64/t_renderer"
+
     brew_prefix = subprocess.check_output(['brew', '--prefix'], encoding='utf8').strip()
     yuv_dir = "mac" if real_arch != "arm64" else "mac_arm64"
     libpath = [
@@ -115,9 +120,13 @@ else:
       f"{brew_prefix}/Library",
       f"{brew_prefix}/opt/openssl/lib",
       f"{brew_prefix}/Cellar",
-      f"#third_party/acados/{arch}/lib",
       "/System/Library/Frameworks/OpenGL.framework/Libraries",
     ]
+    if real_arch == "x86_64":
+      libpath.append(f"#third_party/acados/Darwin_x86_64/lib")
+    else:
+      libpath.append(f"#third_party/acados/{arch}/lib")
+
     cflags += ["-DGL_SILENCE_DEPRECATION"]
     cxxflags += ["-DGL_SILENCE_DEPRECATION"]
     cpppath += [
@@ -254,7 +263,7 @@ def abspath(x):
     # rpath works elsewhere
     return x[0].path.rsplit("/", 1)[1][:-3]
 
-# Cython build enviroment
+# Cython build environment
 py_include = sysconfig.get_paths()['include']
 envCython = env.Clone()
 envCython["CPPPATH"] += [py_include, np.get_include()]
@@ -289,12 +298,15 @@ if arch == "Darwin":
   qt_env["FRAMEWORKS"] += [f"Qt{m}" for m in qt_modules] + ["OpenGL"]
   qt_env.AppendENVPath('PATH', os.path.join(qt_env['QTDIR'], "bin"))
 else:
-  qt_env['QTDIR'] = "/usr"
+  qt_install_prefix = subprocess.check_output(['qmake', '-query', 'QT_INSTALL_PREFIX'], encoding='utf8').strip()
+  qt_install_headers = subprocess.check_output(['qmake', '-query', 'QT_INSTALL_HEADERS'], encoding='utf8').strip()
+  
+  qt_env['QTDIR'] = qt_install_prefix
   qt_dirs = [
-    f"/usr/include/{real_arch}-linux-gnu/qt5",
-    f"/usr/include/{real_arch}-linux-gnu/qt5/QtGui/5.12.8/QtGui",
+    f"{qt_install_headers}",
+    f"{qt_install_headers}/QtGui/5.12.8/QtGui",
   ]
-  qt_dirs += [f"/usr/include/{real_arch}-linux-gnu/qt5/Qt{m}" for m in qt_modules]
+  qt_dirs += [f"{qt_install_headers}/Qt{m}" for m in qt_modules]
 
   qt_libs = [f"Qt5{m}" for m in qt_modules]
   if arch == "larch64":
@@ -318,6 +330,7 @@ qt_flags = [
 qt_env['CXXFLAGS'] += qt_flags
 qt_env['LIBPATH'] += ['#selfdrive/ui']
 qt_env['LIBS'] = qt_libs
+qt_env['QT_MOCHPREFIX'] = cache_dir + '/moc_files/moc_'
 
 if GetOption("clazy"):
   checks = [
@@ -422,7 +435,12 @@ SConscript(['selfdrive/sensord/SConscript'])
 SConscript(['selfdrive/ui/SConscript'])
 SConscript(['selfdrive/navd/SConscript'])
 
-SConscript(['tools/replay/SConscript'])
+if arch in ['x86_64', 'Darwin'] or GetOption('extras'):
+  SConscript(['tools/replay/SConscript'])
+
+  opendbc = abspath([File('opendbc/can/libdbc.so')])
+  Export('opendbc')
+  SConscript(['tools/cabana/SConscript'])
 
 if GetOption('test'):
   SConscript('panda/tests/safety/SConscript')
