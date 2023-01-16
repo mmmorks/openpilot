@@ -3,7 +3,7 @@ from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
 from common.numpy_fast import interp
-from selfdrive.car.honda.values import CarControllerParams, CruiseButtons, HondaFlags, CAR, CAR_INFO, HONDA_BOSCH, HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_ALT_BRAKE_SIGNAL, HONDA_BOSCH_RADARLESS
+from selfdrive.car.honda.values import CarControllerParams, CruiseButtons, CruiseSettings, HondaFlags, CAR, CAR_INFO, HONDA_BOSCH, HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_ALT_BRAKE_SIGNAL, HONDA_BOSCH_RADARLESS
 from selfdrive.car import STD_CARGO_KG, CivicParams, create_button_event, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint, get_safety_config
 from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.car.disable_ecu import disable_ecu
@@ -14,6 +14,7 @@ EventName = car.CarEvent.EventName
 TransmissionType = car.CarParams.TransmissionType
 BUTTONS_DICT = {CruiseButtons.RES_ACCEL: ButtonType.accelCruise, CruiseButtons.DECEL_SET: ButtonType.decelCruise,
                 CruiseButtons.MAIN: ButtonType.altButton3, CruiseButtons.CANCEL: ButtonType.cancel}
+SETTING_DICT = {CruiseSettings.LKAS_BUTTON: ButtonType.altButton1, CruiseSettings.DISTANCE_ADJ: ButtonType.gapAdjustCruise}
 
 
 class CarInterface(CarInterfaceBase):
@@ -345,7 +346,7 @@ class CarInterface(CarInterfaceBase):
       buttonEvents.append(create_button_event(self.CS.cruise_buttons, self.CS.prev_cruise_buttons, BUTTONS_DICT))
 
     if self.CS.cruise_setting != self.CS.prev_cruise_setting:
-      buttonEvents.append(create_button_event(self.CS.cruise_setting, self.CS.prev_cruise_setting, {1: ButtonType.altButton1}))
+      buttonEvents.append(create_button_event(self.CS.cruise_setting, self.CS.prev_cruise_setting, SETTING_DICT))
 
     ret.buttonEvents = buttonEvents
 

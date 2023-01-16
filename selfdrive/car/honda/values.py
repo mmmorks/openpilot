@@ -56,6 +56,10 @@ class CruiseButtons:
   CANCEL = 2
   MAIN = 1
 
+# Car cruise settings
+class CruiseSettings:
+  DISTANCE_ADJ = 3
+  LKAS_BUTTON = 1
 
 # See dbc files for info on values
 VISUAL_HUD = {

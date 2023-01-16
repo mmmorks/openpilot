@@ -253,6 +253,11 @@ class CarInterfaceBase(ABC):
       # Disable on rising and falling edge of cancel for both stock and OP long
       if b.type == ButtonType.cancel:
         events.add(EventName.buttonCancel)
+      if b.type == ButtonType.gapAdjustCruise and b.pressed:
+        if Params().get_bool("ExperimentalMode"):
+          events.add(EventName.experimentalModeDisabled)
+        else:
+          events.add(EventName.experimentalModeEnabled)
 
     # Handle permanent and temporary steering faults
     self.steering_unpressed = 0 if cs_out.steeringPressed else self.steering_unpressed + 1
