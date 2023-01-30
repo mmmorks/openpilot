@@ -6,64 +6,19 @@ from panda.format.x5a import x5a
 from panda import Panda
 from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
 
-def read_file(fn):
-    f_name, f_ext = os.path.splitext(fn)
-    f_base = os.path.basename(f_name)
-    open_fn = open
-    if f_ext == ".gz":
-        open_fn = gzip.open
-        f_name, f_ext = os.path.splitext(f_name)
-
-    with open_fn(fn, 'rb') as f:
-        f_data = f.read()
-
-    return f_data
-
-def validate_fw(fw, block_end_addrs):
-    start = 0
-    for end in block_end_addrs:
-        sum = 0
-        for i in range(start, end, 4):
-            sum += struct.unpack('<I', fw[i:i+4])[0]
-            sum &= 0xFFFFFFFF
-        assert sum == 0, 'Checksum failed for block ending {}'.format(end)
-        start = end
-
-def calculate_session_key(const_bytes, seed_bytes):
+def calculate_key(const_bytes, seed_bytes):
     k0, k1, k2 = struct.unpack('!HHH', const_bytes)
     seed = struct.unpack('!H', seed_bytes)[0]
     if k2 == 0:
         k2 = 0x10000
 
-    key = (seed + k0) ^ (seed * k1) % k2
+    key = (seed + k0) ^ (seed * k1) % k2;
     return struct.pack('!H', key)
 
-def decrypt(fw, ops):
-    key = fw.keys
-    assert len(key) == 3
-    assert len(ops) == 3
-
-    o0 = fw.operator_lut[ops[0]]
-    o1 = fw.operator_lut[ops[1]]
-    o2 = fw.operator_lut[ops[2]]
-    decoder = fw._get_decoder(int(key[0]), int(key[1]), int(key[2]), o0, o1, o2)
-    plain, _ = fw.decrypt(decoder)
-    return plain
-
 if __name__ == "__main__":
-  f_name = "\\\\wsl$\\Ubuntu\\home\\john\\Code\\greg-rwd-xray\\39990-TG7-A060-M1.rwd.gz" #sys.argv[1]
-  fw_ops = '+^-' #sys.argv[2]
-  f_raw = read_file(f_name)
-  fw = x5a(f_raw)
-
-  validate_fw(decrypt(fw, fw_ops), [0xa000, 0x1d000, 0x4ff00])
-  assert len(fw.firmware_blocks) == 1
-
-  print(fw)
-
   panda = Panda()
   panda.set_safety_mode(Panda.SAFETY_ELM327)
-  address = 0x18da30f1 # EPS
+  address = 0x18DA10F1 # ECM
   uds_client = UdsClient(panda, address, debug=False)
   print("tester present ...")
   uds_client.tester_present()
@@ -76,7 +31,7 @@ if __name__ == "__main__":
     print("Security access request key for seed 1")
     data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED)
     print(data)
-    key = calculate_session_key(data[-2:])
+    key = calculate_key(data[-2:])
     print("key = ", key)
 
     print("Security access send key for seed 1")
@@ -96,6 +51,7 @@ if __name__ == "__main__":
     print(data)
 
     print("Requesting download")
+    assert len(fw.firmware_blocks) == 1
     block = fw.firmware_blocks[0]
     length = block["length"]
     max_chunk_size = uds_client.request_download(block["start"], length)
@@ -105,7 +61,7 @@ if __name__ == "__main__":
     seq = 0
     while cursor < length:
         block_size = min(max_chunk_size, length - cursor) 
-        data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+block_size])
+        data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+blocksize])
         print(data)
         seq += 1
     

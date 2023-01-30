@@ -13,7 +13,24 @@ class Base(object):
         self._firmware_encrypted = encrypted
         self._keys = keys
 
+        self._operators = [
+            { 'fn': operator.__xor__, 'sym': '^' },
+            { 'fn': operator.__and__, 'sym': '&' },
+            { 'fn': operator.__or__,  'sym': '|' },
+            { 'fn': operator.__add__, 'sym': '+' },
+            { 'fn': operator.__sub__, 'sym': '-' },
+            { 'fn': operator.__mul__, 'sym': '*' },
+            { 'fn': operator.__truediv__, 'sym': '/' },
+            { 'fn': operator.__mod__, 'sym': '%' },
+        ]
+
+        self._operator_lut = {o['sym']: o['fn'] for o in self._operators}
+
         self.validate_file_checksum(data)
+
+    @property
+    def operator_lut(self):
+        return self._operator_lut
 
     @property
     def file_format(self):
@@ -53,12 +70,12 @@ class Base(object):
 
         for e in range(256):
             d = op3(op2(op1(e, key1), key2), key3) & 0xFF
-            decoder[chr(e)] = chr(d)
+            decoder[e.to_bytes(1, 'big')] = d.to_bytes(1, 'big')
             values.add(d)
 
         return decoder if len(values) == 256 else None
 
-    def decrypt(self, search_value):
+    def crack(self, search_value):
         search_value_padded = ''.join(map(lambda c: c + '.', search_value))
         print("search:")
         print(search_value)
@@ -68,16 +85,7 @@ class Base(object):
         # sometimes there is an extra character after each character
         # 37805-RBB-J530 -> 3377880550--RRBCBA--JA503000
         search_padded = re.compile('.*'+search_value_padded+'.*', flags=re.IGNORECASE|re.MULTILINE|re.DOTALL)
-        operators = [
-            { 'fn': operator.__xor__, 'sym': '^' },
-            { 'fn': operator.__and__, 'sym': '&' },
-            { 'fn': operator.__or__,  'sym': '|' },
-            { 'fn': operator.__add__, 'sym': '+' },
-            { 'fn': operator.__sub__, 'sym': '-' },
-            { 'fn': operator.__mul__, 'sym': '*' },
-            { 'fn': operator.__div__, 'sym': '/' },
-            { 'fn': operator.__mod__, 'sym': '%' },
-        ]
+
 
         keys = list()
         for i in range(len(self._keys)):
@@ -88,7 +96,7 @@ class Base(object):
         firmware_candidates = list()
 
         key_perms = list(itertools.permutations(keys))
-        op_perms = list(itertools.product(operators, repeat=3))
+        op_perms = list(itertools.product(self._operators, repeat=3))
         display_ciphers = list()
         attempted_decoders = list()
         for k1, k2, k3 in key_perms:
@@ -101,8 +109,7 @@ class Base(object):
                     continue
                 attempted_decoders.append(decoder)
 
-                candidate = [map(lambda x: decoder[x], e) for e in self._firmware_encrypted]
-                decrypted = ''.join([c for l in candidate for c in l])
+                decrypted, candidate = self.decrypt(decoder)
                 if (search_exact.match(decrypted) or search_padded.match(decrypted)) and candidate not in firmware_candidates:
                     sys.stdout.write('X')
                     firmware_candidates.append([''.join(c) for c in candidate])
@@ -120,6 +127,11 @@ class Base(object):
             print("cipher: {}".format(cipher))
         return firmware_candidates
 
+    def decrypt(self, decoder):
+        candidate = [map(lambda x: decoder[int(x).to_bytes(1, 'big')], e) for e in self._firmware_encrypted]
+        decrypted = b''.join([c for l in candidate for c in l])
+
+        return decrypted, candidate
 
     def __str__(self):
         info = [
