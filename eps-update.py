@@ -20,14 +20,19 @@ def read_file(fn):
     return f_data
 
 def validate_fw(fw, block_end_addrs):
+    sum = 0 # sum at each checksum should be 0 so we don't need to reset it
     start = 0
-    for end in block_end_addrs:
-        sum = 0
-        for i in range(start, end, 4):
-            sum += struct.unpack('<I', fw[i:i+4])[0]
-            sum &= 0xFFFFFFFF
-        assert sum == 0, 'Checksum failed for block ending {}'.format(end)
-        start = end
+    end = max(block_end_addrs)
+    for i in range(start, end, 4):
+        j = i+4
+        sum += struct.unpack('<I', fw[i:j])[0]
+        sum &= 0xFFFFFFFF
+        if j in block_end_addrs:
+            assert sum == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
+            print('Checksum passed for block ending 0x{:08X}'.format(j))
+
+    assert sum == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
+
 
 def calculate_session_key(const_bytes, seed_bytes):
     k0, k1, k2 = struct.unpack('!HHH', const_bytes)
@@ -51,7 +56,7 @@ def decrypt(fw, ops):
     return plain
 
 if __name__ == "__main__":
-  f_name = "\\\\wsl$\\Ubuntu\\home\\john\\Code\\greg-rwd-xray\\39990-TG7-A060-M1.rwd.gz" #sys.argv[1]
+  f_name = sys.argv[1] #"\\\\wsl$\\Ubuntu\\home\\john\\Code\\greg-rwd-xray\\39990-TG7-A060-M1.rwd.gz" #sys.argv[1]
   fw_ops = '+^-' #sys.argv[2]
   f_raw = read_file(f_name)
   fw = x5a(f_raw)
