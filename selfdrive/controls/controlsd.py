@@ -252,6 +252,9 @@ class Controls:
     if CS.gasPressed:
       self.events.add(EventName.gasPressedOverride)
 
+    if not CS.gapAdjustCruisePressed and self.CS_prev.gapAdjustCruisePressed:
+      self.events.add(EventName.buttonGapAdjustCruise)
+
     if not self.CP.notCar:
       self.events.add_from_msg(self.sm['driverMonitoringState'].events)
 
