@@ -1,8 +1,8 @@
 #include "selfdrive/ui/qt/api.h"
 
 #include <openssl/bio.h>
-#include <openssl/pem.h>
-#include <openssl/rsa.h>
+#include <openssl/decoder.h>
+#include <openssl/evp.h>
 
 #include <QApplication>
 #include <QCryptographicHash>
@@ -25,19 +25,31 @@ QByteArray rsa_sign(const QByteArray &data) {
     qDebug() << "No RSA private key found, please run manager.py or registration.py";
     return {};
   }
-
-  BIO* mem = BIO_new_mem_buf(key.data(), key.size());
+  
+  auto mem = BIO_new_mem_buf(key.data(), key.size());
   assert(mem);
-  RSA* rsa_private = PEM_read_bio_RSAPrivateKey(mem, NULL, NULL, NULL);
+  EVP_PKEY* rsa_private = nullptr;
+  auto dctx = OSSL_DECODER_CTX_new_for_pkey(&rsa_private, "PEM", nullptr, "RSA", OSSL_KEYMGMT_SELECT_KEYPAIR, nullptr, nullptr);
+  assert(dctx);
+  assert(1 == OSSL_DECODER_from_bio(dctx, mem));
   assert(rsa_private);
+ 
   auto sig = QByteArray();
-  sig.resize(RSA_size(rsa_private));
-  unsigned int sig_len;
-  int ret = RSA_sign(NID_sha256, (unsigned char*)data.data(), data.size(), (unsigned char*)sig.data(), &sig_len, rsa_private);
-  assert(ret == 1);
+  sig.resize(EVP_PKEY_get_size(rsa_private));
+ 
+  auto mdctx = EVP_MD_CTX_create();
+  assert(mdctx);
+ 
+  size_t sig_len = sig.size();
+  assert(1 == EVP_DigestSignInit(mdctx, nullptr, EVP_sha256(), nullptr, rsa_private));
+  assert(1 == EVP_DigestSign(mdctx, (unsigned char*)sig.data(), &sig_len, (unsigned char*)data.data(), data.size()));
   assert(sig_len == sig.size());
-  BIO_free(mem);
-  RSA_free(rsa_private);
+
+  BIO_free(mem); 
+  EVP_MD_CTX_destroy(mdctx);
+  OSSL_DECODER_CTX_free(dctx);
+  EVP_PKEY_free(rsa_private);
+
   return sig;
 }
 

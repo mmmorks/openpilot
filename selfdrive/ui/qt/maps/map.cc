@@ -313,16 +313,16 @@ void MapWindow::mouseMoveEvent(QMouseEvent *ev) {
 }
 
 void MapWindow::wheelEvent(QWheelEvent *ev) {
-  if (ev->orientation() == Qt::Horizontal) {
+  if (ev->angleDelta().x() != 0) {
       return;
   }
 
-  float factor = ev->delta() / 1200.;
-  if (ev->delta() < 0) {
+  float factor = ev->angleDelta().y() / 1200.;
+  if (ev->angleDelta().y() < 0) {
       factor = factor > -1 ? factor : 1 / factor;
   }
 
-  m_map->scaleBy(1 + factor, ev->pos() / MAP_SCALE);
+  m_map->scaleBy(1 + factor, ev->position() / MAP_SCALE);
   update();
 
   zoom_counter = PAN_TIMEOUT;
@@ -423,7 +423,7 @@ MapInstructions::MapInstructions(QWidget * parent) : QWidget(parent) {
   )");
 
   QPalette pal = palette();
-  pal.setColor(QPalette::Background, QColor(0, 0, 0, 150));
+  pal.setColor(QPalette::Window, QColor(0, 0, 0, 150));
   setAutoFillBackground(true);
   setPalette(pal);
 }
@@ -619,7 +619,7 @@ MapETA::MapETA(QWidget * parent) : QWidget(parent) {
   )");
 
   QPalette pal = palette();
-  pal.setColor(QPalette::Background, QColor(0, 0, 0, 150));
+  pal.setColor(QPalette::Window, QColor(0, 0, 0, 150));
   setAutoFillBackground(true);
   setPalette(pal);
 }
