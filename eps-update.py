@@ -4,10 +4,14 @@ import struct
 import sys
 import tqdm
 import traceback
+from argparse import ArgumentParser
 from panda.format.x5a import x5a
 from panda import Panda
 from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
 from unittest import mock
+
+def auto_int(i):
+    return int(i, 0)
 
 def read_file(fn):
     f_name, f_ext = os.path.splitext(fn)
@@ -71,7 +75,7 @@ def get_uds_client(can_addr):
         uds_client = mock_helper.start()
         uds_client.security_access.return_value = b'1234'
         uds_client.request_download.return_value = 514
-        uds_client.read_data_by_identifier.return_value = b'39990-TG7-A030\x00\x00'
+        uds_client.read_data_by_identifier.return_value = b'39990-TG7-A060\x00\x00'
         print("Using mock client")
 
     return uds_client
@@ -88,12 +92,20 @@ def get_can_address(fw):
     return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
 
 if __name__ == "__main__":
-  f_name = sys.argv[1] #"\\\\wsl$\\Ubuntu\\home\\john\\Code\\greg-rwd-xray\\39990-TG7-A060-M1.rwd.gz" #sys.argv[1]
-  cipher_ops = '+^-' #sys.argv[2]
+  parser = ArgumentParser()
+  parser.add_argument("rwd", help="RWD firmware file to flash")
+  parser.add_argument("-o", "--cipher-ops", default="+^-", help="Operand list for firmware encryption cipher")
+  parser.add_argument("-c", "--checksum-offsets", nargs="*", default=[0xa000, 0x1d000, 0x4ff00], type=auto_int)
+  parser.add_argument("--debug", action="store_true", help="Enable debug output")
+  args = parser.parse_args()
+
+  f_name = args.rwd
+  cipher_ops = args.cipher_ops
+  checksum_offsets = args.checksum_offsets
   f_raw = read_file(f_name)
   fw = x5a(f_raw)
 
-  validate_fw(fw, cipher_ops, [0xa000, 0x1d000, 0x4ff00])
+  validate_fw(fw, cipher_ops, checksum_offsets)
 
   print(fw)
 
@@ -101,6 +113,7 @@ if __name__ == "__main__":
   print("Connecting to CAN address 0x{:08X}".format(can_addr))
   uds_client = get_uds_client(can_addr)
 
+  debug_output = list()
   print("tester present ...")
   uds_client.tester_present()
 
@@ -108,27 +121,33 @@ if __name__ == "__main__":
     print("Getting software version")
     app_id = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION)
     print("Application Software ID = {}".format(app_id))
-    
+
     print("Set diagnostic session type to 3 (extended diagnostic)")
     data = uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
-    
+    debug_output = debug_output + [data]
+
     print("Security access request key for seed 1")
     data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED)
+    debug_output = debug_output + [data]
     secret_key = get_seed_secret(fw, app_id)
     key = calculate_session_key(secret_key, data[-2:])
     print("key = ", key)
 
     print("Security access send key for seed 1")
     data = uds_client.security_access(ACCESS_TYPE.SEND_KEY, key)
+    debug_output = debug_output + [data]
 
     print("Set diagnostic session type to programming")
     data = uds_client.diagnostic_session_control(SESSION_TYPE.PROGRAMMING)
+    debug_output = debug_output + [data]
 
     print("Erasing flash")
     data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)
+    debug_output = debug_output + [data]
 
     print("Setting firmware decryption key")
     data = uds_client.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, fw.keys)
+    debug_output = debug_output + [data]
 
     print("Requesting download")
     assert len(fw.firmware_blocks) == 1
@@ -141,24 +160,27 @@ if __name__ == "__main__":
         cursor = 0x0
         seq = 0
         while cursor < length:
-            block_size = min(max_chunk_size, length - cursor) 
+            block_size = min(max_chunk_size, length - cursor)
             data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+block_size])
+            debug_output = debug_output + [data]
             seq += 1
             cursor += block_size
             t.update(block_size)
-    
-    print("Requesting transfer exit") 
+
+    print("Requesting transfer exit")
     data = uds_client.request_transfer_exit()
+    debug_output = debug_output + [data]
 
     print("Checking programming dependencies")
     data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)
+    debug_output = debug_output + [data]
 
   except Exception:
     print(traceback.format_exc())
 
-if isinstance(uds_client, mock.Mock):  
+  if isinstance(uds_client, mock.Mock):
     from unittest.mock import ANY, call
-    
+
     #print(uds_client.method_calls)
 
     calls = []
@@ -182,3 +204,6 @@ if isinstance(uds_client, mock.Mock):
     calls += [call.request_transfer_exit()]
     calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
     uds_client.assert_has_calls(calls)
+
+  print("\nDebug output:") 
+  print(*debug_output, sep="\n")
