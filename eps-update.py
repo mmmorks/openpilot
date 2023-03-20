@@ -1,95 +1,95 @@
 import gzip
 import os
 import struct
-import sys
 import tqdm
 import traceback
 from argparse import ArgumentParser
+from typing import List
 from panda.format.x5a import x5a
 from panda import Panda
 from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
 from unittest import mock
 
 def auto_int(i):
-    return int(i, 0)
+  return int(i, 0)
 
 def read_file(fn):
-    f_name, f_ext = os.path.splitext(fn)
-    f_base = os.path.basename(f_name)
-    open_fn = open
-    if f_ext == ".gz":
-        open_fn = gzip.open
-        f_name, f_ext = os.path.splitext(f_name)
+  f_name, f_ext = os.path.splitext(fn)
+  open_fn = open
+  if f_ext == ".gz":
+    open_fn = gzip.open
+  f_name, f_ext = os.path.splitext(f_name)
 
-    with open_fn(fn, 'rb') as f:
-        f_data = f.read()
+  with open_fn(fn, 'rb') as f:
+    f_data = f.read()
 
-    return f_data
+  return f_data
 
 def validate_fw(fw_encrypted, cipher_ops, block_end_addrs):
-    assert len(fw_encrypted.firmware_blocks) == 1 # don't know how to handle firmware with more than one section
-    fw = decrypt(fw_encrypted, cipher_ops)
-    sum = 0 # sum at each checksum should be 0 so we don't need to reset it
-    start = 0
-    end = max(block_end_addrs)
-    for i in range(start, end, 4):
-        j = i+4
-        sum += struct.unpack('<I', fw[i:j])[0]
-        sum &= 0xFFFFFFFF
-        if j in block_end_addrs:
-            assert sum == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
-            print('Checksum passed for block ending 0x{:08X}'.format(j))
+  assert len(fw_encrypted.firmware_blocks) == 1 # don't know how to handle firmware with more than one section
+  fw = decrypt(fw_encrypted, cipher_ops)
+  s = 0 # sum at each checksum should be 0 so we don't need to reset it
+  start = 0
+  end = max(block_end_addrs)
+  for i in range(start, end, 4):
+    j = i+4
+    s += struct.unpack('<I', fw[i:j])[0]
+    s &= 0xFFFFFFFF
+    if j in block_end_addrs:
+      assert s == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
+      print('Checksum passed for block ending 0x{:08X}'.format(j))
 
-    assert sum == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
+  assert s == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
 
 
 def calculate_session_key(const_bytes, seed_bytes):
-    k0, k1, k2 = struct.unpack('!HHH', const_bytes)
-    seed = struct.unpack('!H', seed_bytes)[0]
-    if k2 == 0:
-        k2 = 0x10000
+  k0, k1, k2 = struct.unpack('!HHH', const_bytes)
+  seed = struct.unpack('!H', seed_bytes)[0]
+  if k2 == 0:
+    k2 = 0x10000
 
-    key = (seed + k0) ^ (seed * k1) % k2
-    return struct.pack('!H', key)
+  key = (seed + k0) ^ (seed * k1) % k2
+  return struct.pack('!H', key)
 
 def decrypt(fw, ops):
-    key = fw.keys
-    assert len(key) == 3
-    assert len(ops) == 3
+  key = fw.keys
+  assert len(key) == 3
+  assert len(ops) == 3
 
-    o0 = fw.operator_lut[ops[0]]
-    o1 = fw.operator_lut[ops[1]]
-    o2 = fw.operator_lut[ops[2]]
-    decoder = fw._get_decoder(int(key[0]), int(key[1]), int(key[2]), o0, o1, o2)
-    plain, _ = fw.decrypt(decoder)
-    return plain
+  o0 = fw.operator_lut[ops[0]]
+  o1 = fw.operator_lut[ops[1]]
+  o2 = fw.operator_lut[ops[2]]
+  decoder = fw._get_decoder(int(key[0]), int(key[1]), int(key[2]), o0, o1, o2)
+  plain, _ = fw.decrypt(decoder)
+  return plain
 
-def get_uds_client(can_addr):
-    try:
-        panda = Panda(disable_checks=True)
-        panda.set_safety_mode(Panda.SAFETY_ELM327)
-        uds_client = UdsClient(panda, can_addr, debug=False)
-        print("Using real client")
-    except:
-        mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
-        uds_client = mock_helper.start()
-        uds_client.security_access.return_value = b'1234'
-        uds_client.request_download.return_value = 514
-        uds_client.read_data_by_identifier.return_value = b'39990-TG7-A060\x00\x00'
-        print("Using mock client")
+def get_uds_client(can_addr, debug):
+  try:
+    panda = Panda(disable_checks=True)
+    panda.set_safety_mode(Panda.SAFETY_ELM327)
+    uds_client = UdsClient(panda, can_addr, debug=False)
+    print("Using real client")
+  except Exception:
+    mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
+    uds_client = mock_helper.start()
+    uds_client.security_access.return_value = b'1234'
+    uds_client.request_download.return_value = 514
+    uds_client.read_data_by_identifier.return_value = b'39990-TG7-A060\x00\x00'
+    print("Using mock client")
 
-    return uds_client
+  return uds_client
 
 def get_seed_secret(fw, app_id):
-    headers = fw.file_headers
-    for i in range(len(headers[4].values)):
-        if headers[3].values[i].value == app_id:
-            return headers[4].values[i].value
+  headers = fw.file_headers
+  for i in range(len(headers[4].values)):
+    if headers[3].values[i].value == app_id:
+      return headers[4].values[i].value
 
-    raise Exception("Couldn't find software seed for software application ID {}".format(app_id))
+  raise RuntimeError("Couldn't find software seed for software application ID {}".format(app_id))
 
 def get_can_address(fw):
-    return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
+  return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
+
 
 if __name__ == "__main__":
   parser = ArgumentParser()
@@ -97,23 +97,20 @@ if __name__ == "__main__":
   parser.add_argument("-o", "--cipher-ops", default="+^-", help="Operand list for firmware encryption cipher")
   parser.add_argument("-c", "--checksum-offsets", nargs="*", default=[0xa000, 0x1d000, 0x4ff00], type=auto_int)
   parser.add_argument("--debug", action="store_true", help="Enable debug output")
+  parser.add_argument("--danger", action="store_true", help="Run in danger mode that actually performs mutating actions")
   args = parser.parse_args()
 
-  f_name = args.rwd
-  cipher_ops = args.cipher_ops
-  checksum_offsets = args.checksum_offsets
-  f_raw = read_file(f_name)
-  fw = x5a(f_raw)
-
-  validate_fw(fw, cipher_ops, checksum_offsets)
+  fw = x5a(read_file(args.rwd))
+  validate_fw(fw, args.cipher_ops, args.checksum_offsets)
 
   print(fw)
 
   can_addr = get_can_address(fw)
   print("Connecting to CAN address 0x{:08X}".format(can_addr))
-  uds_client = get_uds_client(can_addr)
+  uds_client = get_uds_client(can_addr, args.debug)
 
-  debug_output = list()
+  debug_output: List[int] = list()
+
   print("tester present ...")
   uds_client.tester_present()
 
@@ -141,6 +138,9 @@ if __name__ == "__main__":
     data = uds_client.diagnostic_session_control(SESSION_TYPE.PROGRAMMING)
     debug_output = debug_output + [data]
 
+    if not args.danger:
+      raise RuntimeError('Safe mode: aborting before mutating actions')
+
     print("Erasing flash")
     data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)
     debug_output = debug_output + [data]
@@ -157,15 +157,15 @@ if __name__ == "__main__":
     max_chunk_size -= 2 # subtract header bytes
 
     with tqdm.tqdm(total=length, unit='B', unit_scale=True) as t:
-        cursor = 0x0
-        seq = 0
-        while cursor < length:
-            block_size = min(max_chunk_size, length - cursor)
-            data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+block_size])
-            debug_output = debug_output + [data]
-            seq += 1
-            cursor += block_size
-            t.update(block_size)
+      cursor = 0x0
+      seq = 0
+      while cursor < length:
+        block_size = min(max_chunk_size, length - cursor)
+        data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+block_size])
+        debug_output = debug_output + [data]
+        seq += 1
+        cursor += block_size
+        t.update(block_size)
 
     print("Requesting transfer exit")
     data = uds_client.request_transfer_exit()
@@ -205,5 +205,6 @@ if __name__ == "__main__":
     calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
     uds_client.assert_has_calls(calls)
 
-  print("\nDebug output:") 
-  print(*debug_output, sep="\n")
+    if args.debug:
+      print("\nDebug output:") 
+      print(*debug_output, sep="\n")
