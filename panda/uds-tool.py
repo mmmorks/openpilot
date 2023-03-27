@@ -3,9 +3,9 @@
 import struct
 from panda import Panda
 try:
-    from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE
+    from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE
 except ImportError:
-    from panda.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
+    from panda.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE
 from argparse import ArgumentParser
 
 def auto_int(i):
@@ -14,13 +14,13 @@ def auto_int(i):
 def calculate_session_key(uds_client, data):
     app_id = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION)
 
-    if app_id.startswith('39990-TG7'):
+    if app_id.startswith(b'39990-TG7'):
       seed = data[-4:]
       seed1 = seed[0:2]
       seed2 = seed[2:4]
       key = int.from_bytes(seed1, "big") << 16 | int.from_bytes(seed2, "big") + 0x3039
       return key.to_bytes(4, "big")
-    elif app_id.startswith('37805-RLV'):
+    elif app_id.startswith(b'37805-RLV'):
       seed = data[-2:]
       key = (seed * 0x21) >> 2
       return struct.pack('!H', key)
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     p.set_safety_mode(Panda.SAFETY_ELM327)
 
     can_address = 0x18da00f1 | (args.can_id << 8)
-    uds_client = UdsClient(p, address, debug=args.debug)
+    uds_client = UdsClient(p, can_address, debug=args.debug)
     print("tester present ...")
     uds_client.tester_present()
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
         print("Security access request key for seed 61")
         data = uds_client.security_access(ACCESS_TYPE.ADVANCED_SEED)
         print(data)
-        key = calculate_session_key(get_uds_client, data)
+        key = calculate_session_key(uds_client, data)
         print("key = ", key)
 
         print("Security access send key for seed 61")
@@ -68,12 +68,12 @@ if __name__ == "__main__":
         image = bytes()
         while start_addr <= end_addr:
             block_size = min(DEFAULT_BLOCK_SIZE, end_addr - start_addr + 1)
-            uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
-            image += uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
-            #image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
+            #uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
+            #image += uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
+            image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
             start_addr += block_size
 
-        with open("image.bin", "wb") as f:
+        with open(args.output, "wb") as f:
             f.write(image)
 
     except BaseException as e:
