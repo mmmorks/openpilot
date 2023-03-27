@@ -1,14 +1,29 @@
 #/usr/bin/env python3
 
+import struct
 from panda import Panda
 try:
-    from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
+    from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE
 except ImportError:
     from panda.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
 from argparse import ArgumentParser
 
 def auto_int(i):
     return int(i, 0)
+
+def calculate_session_key(uds_client, data):
+    app_id = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION)
+
+    if app_id.startswith('39990-TG7'):
+      seed = data[-4:]
+      seed1 = seed[0:2]
+      seed2 = seed[2:4]
+      key = int.from_bytes(seed1, "big") << 16 | int.from_bytes(seed2, "big") + 0x3039
+      return key.to_bytes(4, "big")
+    elif app_id.startswith('37805-RLV'):
+      seed = data[-2:]
+      key = (seed * 0x21) >> 2
+      return struct.pack('!H', key)
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -35,11 +50,7 @@ if __name__ == "__main__":
         print("Security access request key for seed 61")
         data = uds_client.security_access(ACCESS_TYPE.ADVANCED_SEED)
         print(data)
-        seed = data[-4:]
-        seed1 = seed[0:2]
-        seed2 = seed[2:4]
-        key = int.from_bytes(seed1, "big") << 16 | int.from_bytes(seed2, "big") + 0x3039
-        key = key.to_bytes(4, "big")
+        key = calculate_session_key(get_uds_client, data)
         print("key = ", key)
 
         print("Security access send key for seed 61")
@@ -50,9 +61,9 @@ if __name__ == "__main__":
         data = uds_client.diagnostic_session_control(SESSION_TYPE.GOD_MODE)
         print(data)
 
-        print("Reading memory!")
-        start_addr = 0x0
-        end_addr = 0x5ffff
+        start_addr = args.start_address
+        end_addr = args.end_address
+        print("Reading memory from 0x{:08x} to 0x{:08x}".format(start_addr, end_addr))
         DEFAULT_BLOCK_SIZE = 512
         image = bytes()
         while start_addr <= end_addr:

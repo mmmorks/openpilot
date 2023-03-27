@@ -158,12 +158,12 @@ if __name__ == "__main__":
 
     with tqdm.tqdm(total=length, unit='B', unit_scale=True) as t:
       cursor = 0x0
-      seq = 0
+      seq = 1
       while cursor < length:
         block_size = min(max_chunk_size, length - cursor)
         data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+block_size])
         debug_output = debug_output + [data]
-        seq += 1
+        seq = (seq + 1) & 0xFF
         cursor += block_size
         t.update(block_size)
 
