@@ -1,19 +1,38 @@
-import gzip
-import os
 import struct
-import sys
 from panda.format.x5a import x5a
 from panda import Panda
 from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
 
-def calculate_key(const_bytes, seed_bytes):
-    k0, k1, k2 = struct.unpack('!HHH', const_bytes)
-    seed = struct.unpack('!H', seed_bytes)[0]
-    if k2 == 0:
-        k2 = 0x10000
+'''
+Cyclic rotate bits left
+'''
+def rol(value, n):
+  value &= 0xffffffff
+  return (value << n) | (value >> (32 - n))
 
-    key = (seed + k0) ^ (seed * k1) % k2;
-    return struct.pack('!H', key)
+'''
+Cyclic rotate bits right
+'''
+def ror(value, n):
+  value &= 0xffffffff
+  return (value >> n) | (value << (32 - n))
+
+def calculate_mode_1_key(const_bytes, seed_bytes):
+  k0, k1, k2 = struct.unpack('!HHH', const_bytes)
+  seed = struct.unpack('!H', seed_bytes)[0]
+  if k2 == 0:
+    k2 = 0x10000
+
+  key = (seed + k0) ^ (seed * k1) % k2
+  return struct.pack('!H', key)
+
+def calculate_mode_41_key(seed):
+  salt0 = 0x0
+  salt1 = 0x7279F20E
+  rol_count = 3
+  ror_count = 0
+  const = 0x8E3E8FAA
+  return const + ((seed & 0xffff) * (seed >> 0x10)) ^ rol(seed + salt0, rol_count) ^ ror(seed + salt1, ror_count)
 
 if __name__ == "__main__":
   panda = Panda()
@@ -28,14 +47,15 @@ if __name__ == "__main__":
     data = uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
     print(data)
     
-    print("Security access request key for seed 1")
-    data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED)
+    print("Security access request key for seed 0x41")
+    data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED_0x41)
     print(data)
-    key = calculate_key(data[-2:])
+    key = calculate_mode_41_key(data[-3:-1])
+    algorithm = data[-1]
     print("key = ", key)
 
-    print("Security access send key for seed 1")
-    data = uds_client.security_access(ACCESS_TYPE.SEND_KEY, key)
+    print("Security access send key for seed 0x41")
+    data = uds_client.security_access(ACCESS_TYPE.SEND_KEY_0x41, key, algorithm)
     print(data)
 
     print("Set diagnostic session type to programming")
@@ -60,10 +80,10 @@ if __name__ == "__main__":
     cursor = 0x0
     seq = 0
     while cursor < length:
-        block_size = min(max_chunk_size, length - cursor) 
-        data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+blocksize])
-        print(data)
-        seq += 1
+      block_size = min(max_chunk_size, length - cursor) 
+      data = uds_client.transfer_data(seq, fw.firmware_encrypted[0][cursor:cursor+blocksize])
+      print(data)
+      seq += 1
     
     print("Requesting transfer exit") 
     data = uds_client.request_transfer_exit()
