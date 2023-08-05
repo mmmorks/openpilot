@@ -3,27 +3,77 @@
 import os
 import usb1
 import time
+import json
 import subprocess
 from typing import List, NoReturn
 from functools import cmp_to_key
 
-from panda import Panda, PandaDFU
+from panda import Panda, PandaDFU, PandaProtocolMismatch, FW_PATH
 from common.basedir import BASEDIR
 from common.params import Params
+from selfdrive.boardd.set_time import set_time
 from system.hardware import HARDWARE
 from system.swaglog import cloudlog
 
 
 def get_expected_signature(panda: Panda) -> bytes:
   try:
-    return Panda.get_signature_from_firmware(panda.get_mcu_type().config.app_path)
+    fn = os.path.join(FW_PATH, panda.get_mcu_type().config.app_fn)
+    return Panda.get_signature_from_firmware(fn)
   except Exception:
     cloudlog.exception("Error computing expected signature")
     return b""
 
+def read_panda_logs(panda: Panda) -> None:
+  """
+    Forward panda logs to the cloud
+  """
+
+  params = Params()
+  serial = panda.get_usb_serial()
+
+  log_state = {}
+  try:
+    l = json.loads(params.get("PandaLogState"))
+    for k, v in l.items():
+      if isinstance(k, str) and isinstance(v, int):
+        log_state[k] = v
+  except (TypeError, json.JSONDecodeError):
+    cloudlog.exception("failed to parse PandaLogState")
+
+  try:
+    if serial in log_state:
+      logs = panda.get_logs(last_id=log_state[serial])
+    else:
+      logs = panda.get_logs(get_all=True)
+
+    # truncate logs to 100 entries if needed
+    MAX_LOGS = 100
+    if len(logs) > MAX_LOGS:
+      cloudlog.warning(f"Panda {serial} has {len(logs)} logs, truncating to {MAX_LOGS}")
+      logs = logs[-MAX_LOGS:]
+
+    # update log state
+    if len(logs) > 0:
+      log_state[serial] = logs[-1]["id"]
+
+    for log in logs:
+      if log['timestamp'] is not None:
+        log['timestamp'] = log['timestamp'].isoformat()
+      cloudlog.event("panda_log", **log, serial=serial)
+
+    params.put("PandaLogState", json.dumps(log_state))
+  except Exception:
+    cloudlog.exception(f"Error getting logs for panda {serial}")
+
 
 def flash_panda(panda_serial: str) -> Panda:
-  panda = Panda(panda_serial)
+  try:
+    panda = Panda(panda_serial)
+  except PandaProtocolMismatch:
+    cloudlog.warning("detected protocol mismatch, reflashing panda")
+    HARDWARE.recover_internal_panda()
+    raise
 
   fw_signature = get_expected_signature(panda)
   internal_panda = panda.is_internal()
@@ -43,7 +93,7 @@ def flash_panda(panda_serial: str) -> Panda:
     if internal_panda:
       HARDWARE.recover_internal_panda()
     panda.recover(reset=(not internal_panda))
-    cloudlog.info("Done flashing bootloader")
+    cloudlog.info("Done flashing bootstub")
 
   if panda.bootstub:
     cloudlog.info("Panda still not booting, exiting")
@@ -119,7 +169,7 @@ def main() -> NoReturn:
 
       # sort pandas to have deterministic order
       pandas.sort(key=cmp_to_key(panda_sort_cmp))
-      panda_serials = list(map(lambda p: p.get_usb_serial(), pandas))  # type: ignore
+      panda_serials = list(map(lambda p: p.get_usb_serial(), pandas))
 
       # log panda fw versions
       params.put("PandaSignatures", b','.join(p.get_signature() for p in pandas))
@@ -131,7 +181,14 @@ def main() -> NoReturn:
           params.put_bool("PandaHeartbeatLost", True)
           cloudlog.event("heartbeat lost", deviceState=health, serial=panda.get_usb_serial())
 
+        read_panda_logs(panda)
+
         if first_run:
+          if panda.is_internal():
+            # update time from RTC
+            set_time(cloudlog)
+
+          # reset panda to ensure we're in a good state
           cloudlog.info(f"Resetting panda {panda.get_usb_serial()}")
           if panda.is_internal():
             HARDWARE.reset_internal_panda()
@@ -144,6 +201,9 @@ def main() -> NoReturn:
     except (usb1.USBErrorNoDevice, usb1.USBErrorPipe):
       # a panda was disconnected while setting everything up. let's try again
       cloudlog.exception("Panda USB exception while setting up")
+      continue
+    except PandaProtocolMismatch:
+      cloudlog.exception("pandad.protocol_mismatch")
       continue
     except Exception:
       cloudlog.exception("pandad.uncaught_exception")

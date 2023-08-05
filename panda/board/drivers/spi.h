@@ -1,16 +1,19 @@
 #pragma once
 
-#define SPI_BUF_SIZE 1024U
+#include "crc.h"
+
 #define SPI_TIMEOUT_US 10000U
 
-// we expect less than 50 transactions (including control messages and
-// CAN buffers) at the 100Hz boardd interval, plus some buffer
-#define SPI_IRQ_RATE  6500U
+// got max rate from hitting a non-existent endpoint
+// in a tight loop, plus some buffer
+#define SPI_IRQ_RATE  16000U
 
 #ifdef STM32H7
+#define SPI_BUF_SIZE 2048U
 __attribute__((section(".ram_d1"))) uint8_t spi_buf_rx[SPI_BUF_SIZE];
-__attribute__((section(".ram_d1"))) uint8_t spi_buf_tx[SPI_BUF_SIZE];
+__attribute__((section(".ram_d2"))) uint8_t spi_buf_tx[SPI_BUF_SIZE];
 #else
+#define SPI_BUF_SIZE 1024U
 uint8_t spi_buf_rx[SPI_BUF_SIZE];
 uint8_t spi_buf_tx[SPI_BUF_SIZE];
 #endif
@@ -37,7 +40,7 @@ uint8_t spi_endpoint;
 uint16_t spi_data_len_mosi;
 uint16_t spi_data_len_miso;
 uint16_t spi_checksum_error_count = 0;
-
+bool spi_can_tx_ready = false;
 
 #define SPI_HEADER_SIZE 7U
 
@@ -45,6 +48,56 @@ uint16_t spi_checksum_error_count = 0;
 void llspi_init(void);
 void llspi_mosi_dma(uint8_t *addr, int len);
 void llspi_miso_dma(uint8_t *addr, int len);
+
+void can_tx_comms_resume_spi(void) {
+  spi_can_tx_ready = true;
+}
+
+uint16_t spi_version_packet(uint8_t *out) {
+  // this protocol version request is a stable portion of
+  // the panda's SPI protocol. its contents match that of the
+  // panda USB descriptors and are sufficent to list/enumerate
+  // a panda, determine panda type, and bootstub status.
+
+  // the response is:
+  // VERSION + 2 byte data length + data + CRC8
+
+  // echo "VERSION"
+  (void)memcpy(out, "VERSION", 7);
+
+  // write response
+  uint16_t data_len = 0;
+  uint16_t data_pos = 7U + 2U;
+
+  // write serial
+  #ifdef UID_BASE
+  (void)memcpy(&out[data_pos], ((uint8_t *)UID_BASE), 12);
+  data_len += 12U;
+  #endif
+
+  // HW type
+  out[data_pos + data_len] = hw_type;
+  data_len += 1U;
+
+  // bootstub
+  out[data_pos + data_len] = USB_PID & 0xFFU;
+  data_len += 1U;
+
+  // SPI protocol version
+  out[data_pos + data_len] = 0x2;
+  data_len += 1U;
+
+  // data length
+  out[7] = data_len & 0xFFU;
+  out[8] = (data_len >> 8) & 0xFFU;
+
+  // CRC8
+  uint16_t resp_len = data_pos + data_len;
+  out[resp_len] = crc_checksum(out, resp_len, 0xD5U);
+  resp_len += 1U;
+
+  return resp_len;
+}
 
 void spi_init(void) {
   // platform init
@@ -74,7 +127,10 @@ void spi_rx_done(void) {
   spi_data_len_mosi = (spi_buf_rx[3] << 8) | spi_buf_rx[2];
   spi_data_len_miso = (spi_buf_rx[5] << 8) | spi_buf_rx[4];
 
-  if (spi_state == SPI_STATE_HEADER) {
+  if (memcmp(spi_buf_rx, "VERSION", 7) == 0) {
+    response_len = spi_version_packet(spi_buf_tx);
+    next_rx_state = SPI_STATE_HEADER_NACK;;
+  } else if (spi_state == SPI_STATE_HEADER) {
     checksum_valid = check_checksum(spi_buf_rx, SPI_HEADER_SIZE);
     if ((spi_buf_rx[0] == SPI_SYNC_BYTE) && checksum_valid) {
       // response: ACK and start receiving data portion
@@ -114,8 +170,14 @@ void spi_rx_done(void) {
         response_ack = true;
       } else if (spi_endpoint == 3U) {
         if (spi_data_len_mosi > 0U) {
-          comms_can_write(&spi_buf_rx[SPI_HEADER_SIZE], spi_data_len_mosi);
-          response_ack = true;
+          if (spi_can_tx_ready) {
+            spi_can_tx_ready = false;
+            comms_can_write(&spi_buf_rx[SPI_HEADER_SIZE], spi_data_len_mosi);
+            response_ack = true;
+          } else {
+            response_ack = false;
+            print("SPI: CAN NACK\n");
+          }
         } else {
           print("SPI: did expect data for can_write\n");
         }
@@ -126,7 +188,7 @@ void spi_rx_done(void) {
       // Checksum was incorrect
       response_ack = false;
       print("- incorrect data checksum ");
-      puth2(spi_data_len_mosi);
+      puth4(spi_data_len_mosi);
       print("\n");
       hexdump(spi_buf_rx, SPI_HEADER_SIZE);
       hexdump(&(spi_buf_rx[SPI_HEADER_SIZE]), MIN(spi_data_len_mosi, 64));
