@@ -1,12 +1,16 @@
 #pragma once
 
 #include <atomic>
+#include <map>
+#include <memory>
 #include <mutex>
+#include <tuple>
+#include <vector>
 
 #include <QFuture>
 #include <QLabel>
-#include <QPushButton>
 #include <QSlider>
+#include <QToolButton>
 
 #include "selfdrive/ui/qt/widgets/cameraview.h"
 #include "tools/cabana/streams/abstractstream.h"
@@ -33,7 +37,6 @@ class Slider : public QSlider {
 
 public:
   Slider(QWidget *parent);
-  ~Slider();
   double currentSecond() const { return value() / factor; }
   void setCurrentSecond(double sec) { setValue(sec * factor); }
   void setTimeRange(double min, double max);
@@ -77,7 +80,8 @@ protected:
   double maximum_time = 0;
   QLabel *end_time_label;
   QLabel *time_label;
-  QPushButton *play_btn;
+  QToolButton *play_btn;
+  QToolButton *skip_to_end_btn = nullptr;
   InfoLabel *alert_label;
   Slider *slider;
 };

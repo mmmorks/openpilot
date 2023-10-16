@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
 
 from cereal import car
-from common.conversions import Conversions as CV
+from openpilot.common.conversions import Conversions as CV
 
 GOOD_TORQUE_THRESHOLD = 1.0  # m/s^2
 MODEL_YEARS_RE = r"(?<= )((\d{4}-\d{2})|(\d{4}))(,|$)"
@@ -50,7 +50,7 @@ class BasePart:
 
 class EnumBase(Enum):
   @property
-  def type(self):
+  def part_type(self):
     return PartType(self.__class__)
 
 
@@ -84,7 +84,8 @@ class CarHarness(EnumBase):
   nidec = BaseCarHarness("Honda Nidec connector")
   bosch_a = BaseCarHarness("Honda Bosch A connector")
   bosch_b = BaseCarHarness("Honda Bosch B connector")
-  toyota = BaseCarHarness("Toyota connector")
+  toyota_a = BaseCarHarness("Toyota A connector")
+  toyota_b = BaseCarHarness("Toyota B connector")
   subaru_a = BaseCarHarness("Subaru A connector")
   subaru_b = BaseCarHarness("Subaru B connector")
   subaru_c = BaseCarHarness("Subaru C connector")
@@ -110,6 +111,7 @@ class CarHarness(EnumBase):
   hyundai_o = BaseCarHarness("Hyundai O connector")
   hyundai_p = BaseCarHarness("Hyundai P connector")
   hyundai_q = BaseCarHarness("Hyundai Q connector")
+  hyundai_r = BaseCarHarness("Hyundai R connector")
   custom = BaseCarHarness("Developer connector")
   obd_ii = BaseCarHarness("OBD-II connector", parts=[Cable.long_obdc_cable, Cable.long_obdc_cable], has_connector=False)
   gm = BaseCarHarness("GM connector")
@@ -121,14 +123,15 @@ class CarHarness(EnumBase):
 
 
 class Device(EnumBase):
-  three = BasePart("comma three", parts=[Mount.mount, Cable.right_angle_obd_c_cable_1_5ft])
-  # variant of comma three with angled mounts
-  three_angled_mount = BasePart("comma three", parts=[Mount.angled_mount_8_degrees, Cable.right_angle_obd_c_cable_1_5ft])
+  threex = BasePart("comma 3X", parts=[Mount.mount, Cable.right_angle_obd_c_cable_1_5ft])
+  # variant of comma 3X with angled mounts
+  threex_angled_mount = BasePart("comma 3X", parts=[Mount.angled_mount_8_degrees, Cable.right_angle_obd_c_cable_1_5ft])
   red_panda = BasePart("red panda")
 
 
 class Kit(EnumBase):
-  red_panda_kit = BasePart("CAN FD panda kit", parts=[Device.red_panda, Accessory.harness_box, Cable.usb_a_2_a_cable, Cable.usbc_otg_cable, Cable.obd_c_cable_1_5ft])
+  red_panda_kit = BasePart("CAN FD panda kit", parts=[Device.red_panda, Accessory.harness_box,
+                                                      Cable.usb_a_2_a_cable, Cable.usbc_otg_cable, Cable.obd_c_cable_1_5ft])
 
 
 class Tool(EnumBase):
@@ -146,7 +149,7 @@ class PartType(Enum):
   tool = Tool
 
 
-DEFAULT_CAR_PARTS: List[EnumBase] = [Device.three]
+DEFAULT_CAR_PARTS: List[EnumBase] = [Device.threex]
 
 
 @dataclass
@@ -173,10 +176,12 @@ CarFootnote = namedtuple("CarFootnote", ["text", "column", "docs_only", "shop_fo
 
 class CommonFootnote(Enum):
   EXP_LONG_AVAIL = CarFootnote(
-    "Experimental openpilot longitudinal control is available behind a toggle; the toggle is only available in non-release branches such as `devel` or `master-ci`. ",
+    "openpilot Longitudinal Control (Alpha) is available behind a toggle; " +
+    "the toggle is only available in non-release branches such as `devel` or `master-ci`.",
     Column.LONGITUDINAL, docs_only=True)
   EXP_LONG_DSU = CarFootnote(
-    "By default, this car will use the stock Adaptive Cruise Control (ACC) for longitudinal control. If the Driver Support Unit (DSU) is disconnected, openpilot ACC will replace " +
+    "By default, this car will use the stock Adaptive Cruise Control (ACC) for longitudinal control. " +
+    "If the Driver Support Unit (DSU) is disconnected, openpilot ACC will replace " +
     "stock ACC. <b><i>NOTE: disconnecting the DSU disables Automatic Emergency Braking (AEB).</i></b>",
     Column.LONGITUDINAL)
 

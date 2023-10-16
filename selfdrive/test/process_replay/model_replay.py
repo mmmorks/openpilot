@@ -6,18 +6,16 @@ from collections import defaultdict
 from typing import Any
 
 import cereal.messaging as messaging
-from common.params import Params
-from common.spinner import Spinner
-from system.hardware import PC
-from selfdrive.manager.process_config import managed_processes
-from selfdrive.test.openpilotci import BASE_URL, get_url
-from selfdrive.test.process_replay.compare_logs import compare_logs
-from selfdrive.test.process_replay.test_processes import format_diff
-from selfdrive.test.process_replay.process_replay import get_process_config, replay_process
-from system.version import get_commit
-from tools.lib.framereader import FrameReader
-from tools.lib.logreader import LogReader
-from tools.lib.helpers import save_log
+from openpilot.common.params import Params
+from openpilot.system.hardware import PC
+from openpilot.selfdrive.manager.process_config import managed_processes
+from openpilot.selfdrive.test.openpilotci import BASE_URL, get_url
+from openpilot.selfdrive.test.process_replay.compare_logs import compare_logs, format_diff
+from openpilot.selfdrive.test.process_replay.process_replay import get_process_config, replay_process
+from openpilot.system.version import get_commit
+from openpilot.tools.lib.framereader import FrameReader
+from openpilot.tools.lib.logreader import LogReader
+from openpilot.tools.lib.helpers import save_log
 
 TEST_ROUTE = "2f4452b03ccb98f0|2022-12-03--13-45-30"
 SEGMENT = 6
@@ -105,14 +103,6 @@ def nav_model_replay(lr):
 
 
 def model_replay(lr, frs):
-  if not PC:
-    spinner = Spinner()
-    spinner.update("starting model replay")
-  else:
-    spinner = None
-
-  log_msgs = []
-
   # modeld is using frame pairs
   modeld_logs = trim_logs_to_max_frames(lr, MAX_FRAMES, {"roadCameraState", "wideRoadCameraState"}, {"roadEncodeIdx", "wideRoadEncodeIdx"})
   dmodeld_logs = trim_logs_to_max_frames(lr, MAX_FRAMES, {"driverCameraState"}, {"driverEncodeIdx"})
@@ -128,18 +118,9 @@ def model_replay(lr, frs):
   modeld = get_process_config("modeld")
   dmonitoringmodeld = get_process_config("dmonitoringmodeld")
 
-  try:
-    if spinner:
-      spinner.update("running model replay")
-    modeld_msgs = replay_process(modeld, modeld_logs, frs)
-    dmonitoringmodeld_msgs = replay_process(dmonitoringmodeld, dmodeld_logs, frs)
-    log_msgs.extend([m for m in modeld_msgs if m.which() == "modelV2"])
-    log_msgs.extend([m for m in dmonitoringmodeld_msgs if m.which() == "driverStateV2"])
-  finally:
-    if spinner:
-      spinner.close()
-
-  return log_msgs
+  modeld_msgs = replay_process(modeld, modeld_logs, frs)
+  dmonitoringmodeld_msgs = replay_process(dmonitoringmodeld, dmodeld_logs, frs)
+  return modeld_msgs + dmonitoringmodeld_msgs
 
 
 if __name__ == "__main__":
@@ -161,7 +142,7 @@ if __name__ == "__main__":
     import requests
     import threading
     import http.server
-    from selfdrive.test.openpilotci import upload_bytes
+    from openpilot.selfdrive.test.openpilotci import upload_bytes
     os.environ['MAPS_HOST'] = 'http://localhost:5000'
 
     class HTTPRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -196,8 +177,8 @@ if __name__ == "__main__":
       cmp_log = []
 
       # logs are ordered based on type: modelV2, driverStateV2, nav messages (navThumbnail, mapRenderState, navModel)
-      model_start_index = next(i for i, m in enumerate(all_logs) if m.which() == "modelV2")
-      cmp_log += all_logs[model_start_index:model_start_index + MAX_FRAMES]
+      model_start_index = next(i for i, m in enumerate(all_logs) if m.which() in ("modelV2", "cameraOdometry"))
+      cmp_log += all_logs[model_start_index:model_start_index + MAX_FRAMES*2]
       dmon_start_index = next(i for i, m in enumerate(all_logs) if m.which() == "driverStateV2")
       cmp_log += all_logs[dmon_start_index:dmon_start_index + MAX_FRAMES]
       if not NO_NAV:
@@ -244,7 +225,7 @@ if __name__ == "__main__":
 
   # upload new refs
   if (update or failed) and not PC:
-    from selfdrive.test.openpilotci import upload_file
+    from openpilot.selfdrive.test.openpilotci import upload_file
 
     print("Uploading new refs")
 

@@ -226,8 +226,8 @@
         <translation>ปิดเครื่อง</translation>
     </message>
     <message>
-        <source>openpilot requires the device to be mounted within 4° left or right and within 5° up or 8° down. openpilot is continuously calibrating, resetting is rarely required.</source>
-        <translation>openpilot กำหนดให้ติดตั้งอุปกรณ์ โดยสามารถเอียงด้านซ้ายหรือขวาไม่เกิน 4° และเอียงขึ้นด้านบนไม่เกิน 5° หรือเอียงลงด้านล่างไม่เกิน 8° openpilot ทำการคาลิเบรทอย่างต่อเนื่อง แทบจะไม่จำเป็นต้องทำการรีเซ็ตการคาลิเบรท</translation>
+        <source>openpilot requires the device to be mounted within 4° left or right and within 5° up or 9° down. openpilot is continuously calibrating, resetting is rarely required.</source>
+        <translation>openpilot กำหนดให้ติดตั้งอุปกรณ์ โดยสามารถเอียงด้านซ้ายหรือขวาไม่เกิน 4° และเอียงขึ้นด้านบนไม่เกิน 5° หรือเอียงลงด้านล่างไม่เกิน 9° openpilot ทำการคาลิเบรทอย่างต่อเนื่อง แทบจะไม่จำเป็นต้องทำการรีเซ็ตการคาลิเบรท</translation>
     </message>
     <message>
         <source> Your device is pointed %1° %2 and %3° %4.</source>
@@ -272,33 +272,6 @@
     <message>
         <source>Review</source>
         <translation>ทบทวน</translation>
-    </message>
-</context>
-<context>
-    <name>DriveStats</name>
-    <message>
-        <source>Drives</source>
-        <translation>การขับขี่</translation>
-    </message>
-    <message>
-        <source>Hours</source>
-        <translation>ชั่วโมง</translation>
-    </message>
-    <message>
-        <source>ALL TIME</source>
-        <translation>ทั้งหมด</translation>
-    </message>
-    <message>
-        <source>PAST WEEK</source>
-        <translation>สัปดาห์ที่ผ่านมา</translation>
-    </message>
-    <message>
-        <source>KM</source>
-        <translation>กิโลเมตร</translation>
-    </message>
-    <message>
-        <source>Miles</source>
-        <translation>ไมล์</translation>
     </message>
 </context>
 <context>
@@ -352,33 +325,6 @@
     <message>
         <source>hr</source>
         <translation>ชม.</translation>
-    </message>
-    <message>
-        <source>km</source>
-        <translation>กม.</translation>
-    </message>
-    <message>
-        <source>mi</source>
-        <translation>ไมล์</translation>
-    </message>
-</context>
-<context>
-    <name>MapInstructions</name>
-    <message>
-        <source> km</source>
-        <translation> กม.</translation>
-    </message>
-    <message>
-        <source> m</source>
-        <translation> ม.</translation>
-    </message>
-    <message>
-        <source> mi</source>
-        <translation> ไมล์</translation>
-    </message>
-    <message>
-        <source> ft</source>
-        <translation> ฟุต</translation>
     </message>
 </context>
 <context>
@@ -617,6 +563,22 @@
             <numerusform>%n วันที่แล้ว</numerusform>
         </translation>
     </message>
+    <message>
+        <source>km</source>
+        <translation>กม.</translation>
+    </message>
+    <message>
+        <source>m</source>
+        <translation>ม.</translation>
+    </message>
+    <message>
+        <source>mi</source>
+        <translation>ไมล์</translation>
+    </message>
+    <message>
+        <source>ft</source>
+        <translation>ฟุต</translation>
+    </message>
 </context>
 <context>
     <name>Reset</name>
@@ -759,6 +721,10 @@ This may take up to a minute.</source>
     <message>
         <source>No custom software found at this URL.</source>
         <translation>ไม่พบซอฟต์แวร์ที่กำหนดเองที่ URL นี้</translation>
+    </message>
+    <message>
+        <source>Select a language</source>
+        <translation>เลือกภาษา</translation>
     </message>
 </context>
 <context>
