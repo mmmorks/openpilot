@@ -31,6 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--start-address", default=0, type=auto_int, help="Memory read start address")
     parser.add_argument("--end-address", default=0x5FFFF, type=auto_int, help="Memory read end address (inclusive)")
     parser.add_argument("--output", required=True, help="output file")
+    parser.add_argument("--bus", default=0, type=auto_int, help="CAN bus number")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
     args = parser.parse_args()
 
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     p.set_safety_mode(Panda.SAFETY_ELM327)
 
     can_address = 0x18da00f1 | (args.can_id << 8)
-    uds_client = UdsClient(p, can_address, debug=args.debug)
+    uds_client = UdsClient(p, can_address, bus=args.bus, debug=args.debug)
     print("tester present ...")
     uds_client.tester_present()
 
