@@ -20,9 +20,8 @@ Author: Generated based on reverse engineering of TriCore ECU firmware
 import time
 from typing import List
 from unittest import mock
-from panda import Panda
-from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
-from opendbc.car.structs import CarParams
+from panda.python import Panda
+from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE
 from argparse import ArgumentParser
 
 def auto_int(i):
@@ -54,7 +53,7 @@ def is_address_in_valid_range(addr, size):
 def get_uds_client(can_addr, bus):
   try:
     panda = Panda(disable_checks=True)
-    panda.set_safety_mode(CarParams.SafetyModel.elm327)
+    panda.set_safety_mode(Panda.SAFETY_ELM327)
     uds_client = UdsClient(panda, can_addr, bus=bus)
     print("Using real client")
   except Exception:

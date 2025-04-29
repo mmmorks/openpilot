@@ -1,9 +1,8 @@
 #/usr/bin/env python3
 
 import struct
-from panda import Panda
-from opendbc.car.structs import CarParams
-from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE
+from panda.python import Panda
+from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE
 from argparse import ArgumentParser
 
 def auto_int(i):
@@ -34,7 +33,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   p = Panda()
-  p.set_safety_mode(CarParams.SafetyModel.elm327)
+  p.set_safety_mode(Panda.SAFETY_ELM327)
 
   can_address = 0x18da00f1 | (args.can_id << 8)
   uds_client = UdsClient(p, can_address, bus=args.bus)
