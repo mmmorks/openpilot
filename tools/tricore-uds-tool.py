@@ -50,14 +50,15 @@ def is_address_in_valid_range(addr, size):
       return True
   return False
 
-def get_uds_client(can_addr, bus):
+def get_uds_client(can_id, bus):
   try:
     panda = Panda(disable_checks=True)
     panda.set_safety_mode(Panda.SAFETY_ELM327)
+    can_addr = 0x18da00f1 | (can_id << 8)
     uds_client = UdsClient(panda, can_addr, bus=bus)
     print("Using real client")
   except Exception:
-    mock_helper = mock.patch('opendbc.car.uds.UdsClient', autospec=True)
+    mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
     uds_client = mock_helper.start()
     uds_client.security_access.return_value = b'\x00\x01\x02\x03'
     uds_client.read_memory_by_address.return_value = b'\x00' * 16
@@ -111,7 +112,7 @@ def calculate_security_key_0x41(seed: bytes) -> bytes:
   # Convert back to bytes (big endian)
   return key.to_bytes(4, byteorder='big')
 
-def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size=255):
+def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size):
   """
   Read memory from the ECU in blocks
 
@@ -119,13 +120,13 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size=2
     uds_client: UDS client instance
     start_addr: Starting address
     end_addr: Ending address (inclusive)
-    block_size: Block size (1-4 bytes)
+    block_size: Block size
 
   Returns:
     Binary data
   """
   if not 1 <= block_size <= 255:
-    raise ValueError("Block size must be between 1 and 4 bytes")
+    raise ValueError("Block size must be between 1 and 255 bytes")
 
   image = bytearray()
   addr = start_addr
@@ -142,7 +143,7 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size=2
         # UDS read memory by address (service 0x23)
         # Last parameter (0x14) is custom header that the ECU expects
         data = uds_client.read_memory_by_address(addr, current_block_size, 4, 1, b'\x14')
-        image.extend(data)
+        image += data
 
         bytes_read += current_block_size
         progress = (bytes_read / total_bytes) * 100
@@ -165,7 +166,7 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size=2
 
 def main():
   parser = ArgumentParser(description="TriCore ECU Memory Reader over UDS")
-  parser.add_argument("--can-id", default=0x7E0, type=auto_int, help="ECU CAN address")
+  parser.add_argument("--can-id", default=0x10, type=auto_int, help="ECU CAN address")
   parser.add_argument("--start-address", required=True, type=auto_int, help="Memory read start address")
   parser.add_argument("--end-address", required=True, type=auto_int, help="Memory read end address (inclusive)")
   parser.add_argument("--block-size", default=255, type=auto_int, help="Memory read block size (1-255 bytes)")
@@ -174,6 +175,9 @@ def main():
   parser.add_argument("--debug", action="store_true", help="Enable debug output")
   parser.add_argument("--skip-security", action="store_true", help="Skip security access (if ECU is already unlocked)")
   args = parser.parse_args()
+
+  if args.can_id < 0x0 or args.can_id > 0xff:
+    parser.error("CAN ID must be between 0x0 and 0xff")
 
   if args.start_address > args.end_address:
     parser.error("Start address must be less than or equal to end address")
@@ -184,6 +188,8 @@ def main():
   if not is_address_in_valid_range(args.end_address, 1):
     print(f"Warning: End address 0x{args.end_address:08x} might not be in a valid memory range")
 
+  
+  print(f"Connecting to UDS for ECU with ID 0x{args.can_id:02x} on bus {args.bus}")
   uds_client = get_uds_client(args.can_id, args.bus)
 
   debug_output: List[int] = list()
@@ -196,8 +202,7 @@ def main():
     # Set diagnostic session to EXTENDED_DIAGNOSTIC
     session_type = SESSION_TYPE.EXTENDED_DIAGNOSTIC
     print(f"Setting diagnostic session to 0x{session_type:02X}...")
-    data = uds_client.diagnostic_session_control(session_type)
-    debug_output += [data]
+    uds_client.diagnostic_session_control(session_type)
 
     # Security access process (unless skipped)
     if not args.skip_security:
@@ -253,9 +258,16 @@ def main():
     calls += [call.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)]
     calls += [call.security_access(ACCESS_TYPE.REQUEST_SEED_0x41)]
     calls += [call.security_access(ACCESS_TYPE.SEND_KEY_0x41, b'\x9c\x8d\xcf\n\x03')]
-    calls += [call.read_memory_by_address(args.start_address, args.end_address - args.start_address + 1, 4, 1, b'\x14')]
     uds_client.assert_has_calls(calls)
 
+    for i in range(args.start_address, args.end_address - args.block_size + 1, args.block_size):
+      calls += [call.read_memory_by_address(i, args.block_size, 4, 1, b'\x14')]
+
+    remainder = (args.end_address - args.start_address + 1) % args.block_size
+    if remainder != 0:
+      calls += [call.read_memory_by_address(args.end_address - remainder + 1, remainder, 4, 1, b'\x14')]
+
+    uds_client.assert_has_calls(calls)
     print(f"\nMock calls:\n{uds_client.method_calls}")
 
 if __name__ == "__main__":
