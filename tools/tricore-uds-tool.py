@@ -281,7 +281,7 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size, 
       try:
         # UDS read memory by address (service 0x23)
         # Last parameter (0x14) is custom header that the ECU expects
-        data = uds_client.read_memory_by_address(addr, current_block_size, 4, 1, b'\x14')
+        data = uds_client.read_memory_by_address(addr, current_block_size, 4, 1)
         image += data
 
         bytes_read += current_block_size
@@ -464,7 +464,7 @@ def main():
       if size <= 0:
         continue
       expected_blocks += 1
-      read_calls.append(call.read_memory_by_address(addr, size, 4, 1, b'\x14'))
+      read_calls.append(call.read_memory_by_address(addr, size, 4, 1))
       
     calls.extend(read_calls)
     
