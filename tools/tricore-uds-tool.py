@@ -258,8 +258,8 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size, 
   Returns:
     Binary data
   """
-  if not 1 <= block_size <= 255:
-    raise ValueError("Block size must be between 1 and 255 bytes")
+  if not 1 <= block_size <= 4:
+    raise ValueError("Block size must be between 1 and 4 bytes")
 
   image = bytearray()
   addr = start_addr
@@ -272,7 +272,6 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size, 
   try:
     while addr <= end_addr:
       current_block_size = min(block_size, end_addr - addr + 1)
-      block_count += 1
       
       if debug:
         print(f"\n[Block {block_count}] Reading {current_block_size} bytes from address 0x{addr:08X}")
@@ -285,6 +284,7 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size, 
         image += data
 
         bytes_read += current_block_size
+        block_count += 1
         progress = (bytes_read / total_bytes) * 100
         
         # Basic progress for non-debug mode
@@ -314,12 +314,13 @@ def read_memory_blocks(uds_client: UdsClient, start_addr, end_addr, block_size, 
         if debug:
           print(f"  - Block {block_count} FAILED")
           print(f"  - Current progress: {progress:.1f}% ({bytes_read}/{total_bytes} bytes)")
-        raise
+        if type(e) == KeyboardInterrupt:
+          raise
+        else:
+          time.sleep(0.01)
+          continue
 
       addr += current_block_size
-
-      # Small delay to prevent overwhelming the ECU
-      time.sleep(0.01)
 
   except KeyboardInterrupt:
     print("\nRead operation interrupted by user")
@@ -340,7 +341,7 @@ def main():
   parser.add_argument("--can-id", default=0x10, type=auto_int, help="ECU CAN address")
   parser.add_argument("--start-address", required=True, type=auto_int, help="Memory read start address")
   parser.add_argument("--end-address", required=True, type=auto_int, help="Memory read end address (inclusive)")
-  parser.add_argument("--block-size", default=255, type=auto_int, help="Memory read block size (1-255 bytes)")
+  parser.add_argument("--block-size", default=4, type=auto_int, help="Memory read block size (1-4 bytes)")
   parser.add_argument("--output", required=True, help="Output file")
   parser.add_argument("--bus", default=0, type=auto_int, help="CAN bus number")
   parser.add_argument("--debug", action="store_true", help="Enable debug output")
@@ -394,7 +395,8 @@ def main():
 
         # Send the key with the algorithm byte
         print("Sending key for security level 0x41...")
-        data = uds_client.security_access(ACCESS_TYPE.SEND_KEY_0x41, key, algo_byte)
+        key_algo = bytearray(key) + algo_byte
+        data = uds_client.security_access(ACCESS_TYPE.SEND_KEY_0x41, key_algo)
         debug_output += [data]
 
         print("Security access granted!")
